@@ -9,6 +9,8 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 func sendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePath string, port int) error {
@@ -39,7 +41,7 @@ func sendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	message += "\r\n" + body.String()
 
 	// Create the attachment part
-	attachmentPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/octet-stream"}, "Content-Disposition": {"attachment; filename=example.html"}})
+	attachmentPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/octet-stream"}, "Content-Disposition": {"attachment; filename=" + strings.ReplaceAll(filepath.Base(htmlFilePath), " ", "_")}})
 	if err != nil {
 		return err
 	}
