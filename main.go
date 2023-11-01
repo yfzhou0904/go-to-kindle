@@ -41,7 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
-	fmt.Println("Parsed.")
+	fmt.Println("Parsed, length =", len(strings.Fields(article.Content)))
 
 	createFile(filepath.Join(baseDir(), "archive", filename))
 	err = writeToFile(article, filepath.Join(baseDir(), "archive", filename))
