@@ -40,6 +40,15 @@ func sendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	}
 	message += "\r\n" + body.String()
 
+	// Create the body part
+	bodyPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"text/plain; charset=UTF-8"}})
+	if err != nil {
+		return err
+	}
+	if _, err := bodyPart.Write([]byte("here's an article for you")); err != nil {
+		return err
+	}
+
 	// Create the attachment part
 	attachmentPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/octet-stream"}, "Content-Disposition": {"attachment; filename=" + strings.ReplaceAll(filepath.Base(htmlFilePath), " ", "_")}})
 	if err != nil {

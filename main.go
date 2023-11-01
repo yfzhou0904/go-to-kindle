@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -34,23 +35,26 @@ func main() {
 		log.Fatalf("Failed to get webpage: %v", err)
 	}
 	defer resp.Body.Close()
+	fmt.Println("Retrieved.")
 
 	article, filename, err := parseWebPage(resp, validURL)
 	if err != nil {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
+	fmt.Println("Parsed.")
 
 	createFile(filepath.Join(baseDir(), "archive", filename))
 	err = writeToFile(article, filepath.Join(baseDir(), "archive", filename))
 	if err != nil {
 		log.Fatalf("Failed to write to file: %v", err)
 	}
+	fmt.Println("Written.")
 
 	err = sendEmailWithAttachment(conf.Email.SMTPServer, conf.Email.From, conf.Email.Password, conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), conf.Email.Port)
 	if err != nil {
 		log.Fatalf("Failed to send email: %v", err)
 	}
-
+	fmt.Println("Email sent.")
 }
 
 func getWebPage(url *url.URL) (*http.Response, error) {
