@@ -1,0 +1,6 @@
+[email]
+smtp_server = "smtp.126.com"
+port = 465
+from = "username@126.com"
+password = "123"
+to = "username@kindle.com"
