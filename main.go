@@ -9,8 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
+	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
 )
 
@@ -44,8 +46,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
-	fmt.Printf("Parsed, length =%d.\n", len(strings.Fields(article.Content)))
-	if len(strings.Fields(article.Content)) < 100 {
+
+	langInfo := whatlanggo.Detect(article.Content)
+	fmt.Printf("Detected language: %s.\n", langInfo.Lang.String())
+	wordCount := 0
+	if langInfo.IsReliable() && langInfo.Lang == whatlanggo.Cmn {
+		wordCount = utf8.RuneCountInString(article.Content)
+		fmt.Printf("Parsed, length = %d.\n", wordCount)
+	} else {
+		wordCount = len(strings.Fields(article.Content))
+		fmt.Printf("Parsed, length = %d.\n", wordCount)
+	}
+	if wordCount < 100 {
 		fmt.Println()
 		fmt.Println(article.Content)
 		fmt.Println()
