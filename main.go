@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 	"unicode/utf8"
@@ -46,6 +47,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
+
+	content := article.Content
+	content = regexp.MustCompile(`<img[^>]*>|<a[^>]*>|<\/a>|<figure>.*?<\/figure>`).ReplaceAllString(content, "")
+	content = regexp.MustCompile(`<source[^>]*>`).ReplaceAllString(content, "")
+	article.Content = content
 
 	langInfo := whatlanggo.Detect(article.Content)
 	fmt.Printf("Detected language: %s.\n", langInfo.Lang.String())
