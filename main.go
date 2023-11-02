@@ -45,6 +45,12 @@ func main() {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
 	fmt.Printf("Parsed, length =%d.\n", len(strings.Fields(article.Content)))
+	if len(strings.Fields(article.Content)) < 100 {
+		fmt.Println()
+		fmt.Println(article.Content)
+		fmt.Println()
+		log.Fatalln("Article is too short, exiting.")
+	}
 
 	createFile(filepath.Join(baseDir(), "archive", filename))
 	err = writeToFile(article, filepath.Join(baseDir(), "archive", filename))
