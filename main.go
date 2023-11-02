@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/BurntSushi/toml"
 	readability "github.com/go-shiori/go-readability"
@@ -29,6 +29,9 @@ func main() {
 		link = "https://" + link
 	}
 	validURL, err := url.Parse(link)
+	if err != nil {
+		log.Fatalf("Failed to parse URL: %v", err)
+	}
 
 	resp, err := getWebPage(validURL)
 	if err != nil {
@@ -41,7 +44,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
-	fmt.Println("Parsed, length =", len(strings.Fields(article.Content)))
+	fmt.Printf("Parsed, length =%d.\n", len(strings.Fields(article.Content)))
 
 	createFile(filepath.Join(baseDir(), "archive", filename))
 	err = writeToFile(article, filepath.Join(baseDir(), "archive", filename))
@@ -74,6 +77,22 @@ func parseWebPage(resp *http.Response, url *url.URL) (*readability.Article, stri
 	return &article, titleToFilename(title), nil
 }
 
+const htmlTemplate = `<!DOCTYPE html>
+<html>
+<head>
+	<title>{{.Title}}</title>
+</head>
+<body>
+	{{.Content}}
+</body>
+</html>
+`
+
+type HtmlData struct {
+	Title   string
+	Content string
+}
+
 func writeToFile(article *readability.Article, filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
@@ -81,7 +100,8 @@ func writeToFile(article *readability.Article, filename string) error {
 	}
 	defer file.Close()
 
-	_, err = io.WriteString(file, article.Content)
+	t := template.Must(template.New("html").Parse(htmlTemplate))
+	err = t.Execute(file, HtmlData{Title: article.Title, Content: article.Content})
 	if err != nil {
 		return err
 	}

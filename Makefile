@@ -7,6 +7,7 @@ BINARY_NAME=go-to-kindle
 build:
 	# Create the bin directory if it doesn't exist
 	mkdir -p bin/
+	mkdir -p ~/.go-to-kindle
 	# Build the main package and place the executable in the bin directory
 	go build -o bin/$(BINARY_NAME) *.go
 
