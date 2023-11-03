@@ -85,10 +85,24 @@ func main() {
 }
 
 func getWebPage(url *url.URL) (*http.Response, error) {
-	resp, err := http.Get(url.String())
+	// Create a new request using http
+	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
+
+	// Set the User-Agent header to mimic a Chrome browser
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
+
+	// Create a new http client
+	client := &http.Client{}
+
+	// Send the request using the client
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	return resp, nil
 }
 
