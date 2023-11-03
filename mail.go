@@ -38,7 +38,7 @@ func sendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	for k, v := range header {
 		message += fmt.Sprintf("%s: %s\r\n", k, v)
 	}
-	message += "\r\n" + body.String()
+	message += "\r\n"
 
 	// Create the body part
 	bodyPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"text/plain; charset=UTF-8"}})
