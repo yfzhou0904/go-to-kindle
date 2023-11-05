@@ -7,14 +7,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"text/template"
 	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
+	"golang.org/x/net/html"
 )
 
 func main() {
@@ -48,10 +49,25 @@ func main() {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
 
-	content := article.Content
-	content = regexp.MustCompile(`<img[^>]*>|<a[^>]*>|<\/a>|<figure>.*?<\/figure>`).ReplaceAllString(content, "")
-	content = regexp.MustCompile(`<source[^>]*>`).ReplaceAllString(content, "")
-	article.Content = content
+	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
+	if err != nil {
+		panic(err)
+	}
+	contentDoc.Find("img,source,figure").Remove()
+	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
+		var buf strings.Builder
+		s.Contents().Each(func(j int, c *goquery.Selection) {
+			if c.Nodes[0].Type == html.TextNode {
+				buf.WriteString(c.Text())
+			}
+		})
+		s.ReplaceWithHtml(buf.String())
+	})
+	article.Content, err = contentDoc.Html()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Removed media.")
 
 	langInfo := whatlanggo.Detect(article.Content)
 	fmt.Printf("Detected language: %s.\n", langInfo.Lang.String())
