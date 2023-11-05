@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"go-to-kindle/mail"
 	"log"
 	"net/http"
 	"net/url"
@@ -28,7 +29,7 @@ func main() {
 	}
 
 	link := os.Args[1]
-	if !strings.HasPrefix(link, "http") {
+	if !strings.HasPrefix(link, "http") { // when user omit http prefix, add it back
 		link = "https://" + link
 	}
 	validURL, err := url.Parse(link)
@@ -53,6 +54,7 @@ func main() {
 	content = regexp.MustCompile(`<source[^>]*>`).ReplaceAllString(content, "")
 	article.Content = content
 
+	// language detection for better word counting
 	langInfo := whatlanggo.Detect(article.Content)
 	fmt.Printf("Detected language: %s.\n", langInfo.Lang.String())
 	wordCount := 0
@@ -77,7 +79,7 @@ func main() {
 	}
 	fmt.Println("Written.")
 
-	err = sendEmailWithAttachment(conf.Email.SMTPServer, conf.Email.From, conf.Email.Password, conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), conf.Email.Port)
+	err = mail.SendEmailWithAttachment(conf.Email.SMTPServer, conf.Email.From, conf.Email.Password, conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), conf.Email.Port)
 	if err != nil {
 		log.Fatalf("Failed to send email: %v", err)
 	}
@@ -91,7 +93,7 @@ func getWebPage(url *url.URL) (*http.Response, error) {
 		return nil, err
 	}
 
-	// Set the User-Agent header to mimic a Chrome browser
+	// Set the User-Agent header to mimic a normal browser
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
 
 	// Create a new http client
@@ -147,6 +149,7 @@ func writeToFile(article *readability.Article, filename string) error {
 	return nil
 }
 
+// replace problematic characters in page title to give a generally valid filename
 func titleToFilename(title string) string {
 	filename := strings.ReplaceAll(title, "/", "-")
 	filename = strings.ReplaceAll(filename, "\\", "-")
@@ -160,6 +163,7 @@ func titleToFilename(title string) string {
 	return filename + ".html"
 }
 
+// user config and article data are stored in ~/.go-to-kindle
 func baseDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {

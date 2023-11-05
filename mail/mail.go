@@ -1,4 +1,4 @@
-package main
+package mail
 
 import (
 	"bytes"
@@ -13,9 +13,7 @@ import (
 	"strings"
 )
 
-func sendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePath string, port int) error {
-
-	// Read the attachment file
+func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePath string, port int) error {
 	attachmentFile, err := os.Open(htmlFilePath)
 	if err != nil {
 		return err
