@@ -50,6 +50,8 @@ func main() {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
 
+	fmt.Println("Filename:", filename)
+
 	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
 	if err != nil {
 		panic(err)
