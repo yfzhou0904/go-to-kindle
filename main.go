@@ -16,7 +16,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
-	"golang.org/x/net/html"
 )
 
 func main() {
@@ -60,9 +59,7 @@ func main() {
 	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
 		var buf strings.Builder
 		s.Contents().Each(func(j int, c *goquery.Selection) {
-			if c.Nodes[0].Type == html.TextNode {
-				buf.WriteString(c.Text())
-			}
+			buf.WriteString(c.Text())
 		})
 		s.ReplaceWithHtml(buf.String())
 	})
