@@ -48,12 +48,7 @@ func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	}
 
 	// Create the attachment part
-	// attachmentPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/octet-stream"}, "Content-Disposition": {"attachment; filename=\"" + strings.ReplaceAll(filepath.Base(htmlFilePath), " ", "_") + "\""}})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// Encode the file name to handle non-ASCII and special characters.
+	// Encode the file name to handle most characters.
 	htmlFileName := filepath.Base(htmlFilePath)
 	encodedHTMLFileName := mime.QEncoding.Encode("utf-8", htmlFileName)
 	attachmentPartHeader := textproto.MIMEHeader{
