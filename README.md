@@ -6,12 +6,17 @@ go v1.21 or newer
 
 # Install & configuration
 ```sh
+go install github.com/yfzhou0904/go-to-kindle@latest
+go-to-kindle <URL>
+```
+or
+```sh
 make
 cp example_config.toml ~/.go-to-kindle/config.toml
-vim ~/.go-to-kindle/config.toml # edit email credential
+vim ~/.go-to-kindle/config.toml # include email credentials
 ```
 
 # Usage
 ```sh
-./bin/go-to-kindle <web article url>
+go-to-kindle <url>
 ```
