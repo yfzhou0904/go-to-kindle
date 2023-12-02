@@ -7,7 +7,6 @@ go v1.21 or newer
 # Install & configuration
 ```sh
 go install github.com/yfzhou0904/go-to-kindle@latest
-go-to-kindle <URL>
 ```
 or
 ```sh
