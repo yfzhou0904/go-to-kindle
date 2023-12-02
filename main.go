@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/yfzhou0904/go-to-kindle/mail"
 
-	"github.com/BurntSushi/toml"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
@@ -31,6 +29,10 @@ var Conf Config = Config{
 }
 
 func main() {
+	Send()
+}
+
+func Send() {
 	var err error
 
 	if err = loadConfig(); err != nil {
@@ -42,7 +44,7 @@ func main() {
 	}
 
 	link := os.Args[1]
-	if !strings.HasPrefix(link, "http") { // when user omit http prefix, add it back
+	if !strings.HasPrefix(link, "http") {
 		link = "https://" + link
 	}
 	validURL, err := url.Parse(link)
@@ -214,63 +216,4 @@ func createFile(p string) (*os.File, error) {
 
 	// Create the file
 	return os.Create(p)
-}
-
-type Config struct {
-	Email ConfigEmail
-}
-type ConfigEmail struct {
-	SMTPServer string `toml:"smtp_server"`
-	Port       int
-	From       string
-	Password   string
-	To         string
-}
-
-func loadConfig() error {
-	filepath := filepath.Join(baseDir(), "config.toml")
-
-	// init example config file if does not exist
-	if _, err := os.Stat(filepath); os.IsNotExist(err) {
-		if err = initConfig(filepath); err != nil {
-			return err
-		}
-		if err = openTextEditor(filepath); err != nil {
-			return err
-		}
-	}
-
-	data, err := os.ReadFile(filepath)
-	if err != nil {
-		return err
-	}
-	return toml.Unmarshal(data, &Conf)
-}
-
-func initConfig(path string) error {
-	fmt.Println("Initializing example config file at", path)
-
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	if err := toml.NewEncoder(file).Encode(&Conf); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func openTextEditor(path string) error {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi"
-	}
-	cmd := exec.Command(editor, path)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
