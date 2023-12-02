@@ -19,9 +19,20 @@ import (
 	readability "github.com/go-shiori/go-readability"
 )
 
+var Conf Config = Config{
+	Email: ConfigEmail{
+		SMTPServer: "smtp.example.com",
+		Port:       456,
+		From:       "YOUR@EMAIL.com",
+		Password:   "YOUR_EMAIL_PSWD",
+		To:         "YOU@kindle.com",
+	},
+}
+
 func main() {
-	conf, err := loadConfig(filepath.Join(baseDir(), "config.toml"))
-	if err != nil {
+	var err error
+
+	if err = loadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
@@ -95,7 +106,7 @@ func main() {
 	}
 	fmt.Println("Written.")
 
-	err = mail.SendEmailWithAttachment(conf.Email.SMTPServer, conf.Email.From, conf.Email.Password, conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), conf.Email.Port)
+	err = mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), Conf.Email.Port)
 	if err != nil {
 		log.Fatalf("Failed to send email: %v", err)
 	}
@@ -191,7 +202,6 @@ func baseDir() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	return filepath.Join(home, ".go-to-kindle")
 }
 
@@ -206,21 +216,46 @@ func createFile(p string) (*os.File, error) {
 }
 
 type Config struct {
-	Email struct {
-		SMTPServer string `toml:"smtp_server"`
-		Port       int
-		From       string
-		Password   string
-		To         string
-	}
+	Email ConfigEmail
+}
+type ConfigEmail struct {
+	SMTPServer string `toml:"smtp_server"`
+	Port       int
+	From       string
+	Password   string
+	To         string
 }
 
-func loadConfig(filename string) (Config, error) {
-	var config Config
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return config, err
+func loadConfig() error {
+	filepath := filepath.Join(baseDir(), "config.toml")
+
+	// init example config file if does not exist
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		if err = initConfig(); err != nil {
+			return err
+		}
 	}
-	err = toml.Unmarshal(data, &config)
-	return config, err
+
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return err
+	}
+	return toml.Unmarshal(data, &Conf)
+}
+
+func initConfig() error {
+	path := filepath.Join(baseDir(), "config.toml")
+	fmt.Println("Initializing config file at", path)
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if err := toml.NewEncoder(file).Encode(&Conf); err != nil {
+		return err
+	}
+
+	return nil
 }
