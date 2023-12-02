@@ -5,12 +5,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/smtp"
 	"net/textproto"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePath string, port int) error {
@@ -48,7 +48,21 @@ func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	}
 
 	// Create the attachment part
-	attachmentPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/octet-stream"}, "Content-Disposition": {"attachment; filename=\"" + strings.ReplaceAll(filepath.Base(htmlFilePath), " ", "_") + "\""}})
+	// attachmentPart, err := writer.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/octet-stream"}, "Content-Disposition": {"attachment; filename=\"" + strings.ReplaceAll(filepath.Base(htmlFilePath), " ", "_") + "\""}})
+	// if err != nil {
+	// 	return err
+	// }
+
+	// Encode the file name to handle non-ASCII and special characters.
+	htmlFileName := filepath.Base(htmlFilePath)
+	encodedHTMLFileName := mime.QEncoding.Encode("utf-8", htmlFileName)
+	attachmentPartHeader := textproto.MIMEHeader{
+		"Content-Type": {"application/octet-stream"},
+		"Content-Disposition": {
+			"attachment; filename=\"" + htmlFileName + "\"; filename*=UTF-8''" + encodedHTMLFileName,
+		},
+	}
+	attachmentPart, err := writer.CreatePart(attachmentPartHeader)
 	if err != nil {
 		return err
 	}
