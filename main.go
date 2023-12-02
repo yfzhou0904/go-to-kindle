@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -231,7 +232,10 @@ func loadConfig() error {
 
 	// init example config file if does not exist
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
-		if err = initConfig(); err != nil {
+		if err = initConfig(filepath); err != nil {
+			return err
+		}
+		if err = openTextEditor(filepath); err != nil {
 			return err
 		}
 	}
@@ -243,9 +247,8 @@ func loadConfig() error {
 	return toml.Unmarshal(data, &Conf)
 }
 
-func initConfig() error {
-	path := filepath.Join(baseDir(), "config.toml")
-	fmt.Println("Initializing config file at", path)
+func initConfig(path string) error {
+	fmt.Println("Initializing example config file at", path)
 
 	file, err := os.Create(path)
 	if err != nil {
@@ -258,4 +261,16 @@ func initConfig() error {
 	}
 
 	return nil
+}
+
+func openTextEditor(path string) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "vi"
+	}
+	cmd := exec.Command(editor, path)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
