@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"go-to-kindle/mail"
 	"log"
 	"net/http"
 	"net/url"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 	"unicode/utf8"
+
+	"github.com/yfzhou0904/go-to-kindle/mail"
 
 	"github.com/BurntSushi/toml"
 	"github.com/PuerkitoBio/goquery"
@@ -70,7 +71,7 @@ func main() {
 	fmt.Println("Removed media.")
 
 	// language detection for better word counting
-	langInfo := whatlanggo.Detect(article.Content)
+	langInfo := whatlanggo.Detect(article.TextContent)
 	fmt.Printf("Detected language: %s.\n", langInfo.Lang.String())
 	wordCount := 0
 	if langInfo.IsReliable() && langInfo.Lang == whatlanggo.Cmn {
@@ -136,6 +137,7 @@ const htmlTemplate = `<!DOCTYPE html>
 <html>
 <head>
 	<title>{{.Title}}</title>
+	<meta name="author" content="{{.Author}}">
 </head>
 <body>
 	{{.Content}}
@@ -146,6 +148,7 @@ const htmlTemplate = `<!DOCTYPE html>
 type HtmlData struct {
 	Title   string
 	Content string
+	Author  string
 }
 
 func writeToFile(article *readability.Article, filename string) error {
@@ -156,7 +159,11 @@ func writeToFile(article *readability.Article, filename string) error {
 	defer file.Close()
 
 	t := template.Must(template.New("html").Parse(htmlTemplate))
-	err = t.Execute(file, HtmlData{Title: article.Title, Content: article.Content})
+	err = t.Execute(file, HtmlData{
+		Title:   article.Title,
+		Author:  article.Byline,
+		Content: article.Content,
+	})
 	if err != nil {
 		return err
 	}
