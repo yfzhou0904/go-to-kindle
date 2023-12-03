@@ -52,6 +52,7 @@ func Send() {
 		log.Fatalf("Failed to parse URL: %v", err)
 	}
 
+	fmt.Printf("Retrieveing webpage %s\n", validURL.String())
 	resp, err := getWebPage(validURL)
 	if err != nil {
 		log.Fatalf("Failed to get webpage: %v", err)
