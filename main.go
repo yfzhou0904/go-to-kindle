@@ -86,10 +86,15 @@ func Send() {
 	fmt.Println("Removed media.")
 
 	// language detection for better word counting
-	langInfo := whatlanggo.Detect(article.TextContent)
-	fmt.Printf("Detected language: %s.\n", langInfo.Lang.String())
+	lang := whatlanggo.DetectLangWithOptions(article.TextContent, whatlanggo.Options{
+		Whitelist: map[whatlanggo.Lang]bool{
+			whatlanggo.Cmn: true,
+			whatlanggo.Eng: true,
+		},
+	})
+	fmt.Printf("Detected language: %s.\n", lang.String())
 	wordCount := 0
-	if langInfo.IsReliable() && langInfo.Lang == whatlanggo.Cmn {
+	if lang == whatlanggo.Cmn {
 		wordCount = utf8.RuneCountInString(article.Content)
 		fmt.Printf("Parsed, length = %d.\n", wordCount)
 	} else {
