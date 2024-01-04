@@ -71,7 +71,7 @@ func Send() {
 	if err != nil {
 		panic(err)
 	}
-	contentDoc.Find("img,source,figure").Remove()
+	contentDoc.Find("img,source,figure,svg").Remove()
 	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
 		var buf strings.Builder
 		s.Contents().Each(func(j int, c *goquery.Selection) {
@@ -79,7 +79,7 @@ func Send() {
 		})
 		s.ReplaceWithHtml(buf.String())
 	})
-	article.Content, err = contentDoc.Html()
+	article.Content, err = contentDoc.Find("body").Html()
 	if err != nil {
 		panic(err)
 	}
@@ -99,7 +99,7 @@ func Send() {
 		fmt.Printf("Parsed, length = %d.\n", wordCount)
 	} else {
 		wordCount = len(strings.Fields(article.Content))
-		fmt.Printf("Parsed, length = %d.\n", wordCount)
+		fmt.Printf("Parsed, length = %d.\n", wordCount/4)
 	}
 	if wordCount < 100 {
 		fmt.Println()

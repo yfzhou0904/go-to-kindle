@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"mime"
 	"mime/multipart"
 	"net/smtp"
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePath string, port int) error {
@@ -61,7 +61,12 @@ func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(attachmentPart, attachmentFile); err != nil {
+	htmlContentBs, err := os.ReadFile(htmlFilePath)
+	if err != nil {
+		return err
+	}
+	htmlContentAscii := escapeNonASCII(string(htmlContentBs))
+	if _, err := attachmentPart.Write([]byte(htmlContentAscii)); err != nil {
 		return err
 	}
 
@@ -123,4 +128,16 @@ func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 	c.Quit()
 
 	return nil
+}
+
+func escapeNonASCII(s string) string {
+	var buf strings.Builder
+	for _, r := range s {
+		if r > 127 {
+			buf.WriteString(fmt.Sprintf("&#%d;", r))
+		} else {
+			buf.WriteRune(r)
+		}
+	}
+	return buf.String()
 }
