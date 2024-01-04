@@ -96,10 +96,10 @@ func Send() {
 	wordCount := 0
 	if lang == whatlanggo.Cmn {
 		wordCount = utf8.RuneCountInString(article.Content)
-		fmt.Printf("Parsed, length = %d.\n", wordCount)
+		fmt.Printf("Parsed, length = %d.\n", wordCount/4)
 	} else {
 		wordCount = len(strings.Fields(article.Content))
-		fmt.Printf("Parsed, length = %d.\n", wordCount/4)
+		fmt.Printf("Parsed, length = %d.\n", wordCount)
 	}
 	if wordCount < 100 {
 		fmt.Println()
