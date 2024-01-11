@@ -133,7 +133,9 @@ func getWebPage(url *url.URL) (*http.Response, error) {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
 
 	// Create a new http client
-	client := &http.Client{}
+	client := http.Client{
+		Transport: http.DefaultTransport.(*http.Transport).Clone(),
+	}
 
 	// Send the request using the client
 	resp, err := client.Do(req)
