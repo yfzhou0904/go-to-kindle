@@ -195,15 +195,15 @@ func writeToFile(article *readability.Article, filename string) error {
 
 // replace problematic characters in page title to give a generally valid filename
 func titleToFilename(title string) string {
-	filename := strings.ReplaceAll(title, "/", "-")
-	filename = strings.ReplaceAll(filename, "\\", "-")
-	filename = strings.ReplaceAll(filename, ":", "-")
-	filename = strings.ReplaceAll(filename, "*", "-")
-	filename = strings.ReplaceAll(filename, "?", "-")
-	filename = strings.ReplaceAll(filename, "\"", "-")
-	filename = strings.ReplaceAll(filename, "<", "-")
-	filename = strings.ReplaceAll(filename, ">", "-")
-	filename = strings.ReplaceAll(filename, "|", "-")
+	filename := strings.ReplaceAll(title, "/", "_")
+	filename = strings.ReplaceAll(filename, "\\", "_")
+	filename = strings.ReplaceAll(filename, ":", "_")
+	filename = strings.ReplaceAll(filename, "*", "_")
+	filename = strings.ReplaceAll(filename, "?", "_")
+	filename = strings.ReplaceAll(filename, "\"", "_")
+	filename = strings.ReplaceAll(filename, "<", "_")
+	filename = strings.ReplaceAll(filename, ">", "_")
+	filename = strings.ReplaceAll(filename, "|", "_")
 	return filename + ".html"
 }
 
