@@ -44,23 +44,41 @@ func Send() {
 	}
 
 	link := os.Args[1]
-	if !strings.HasPrefix(link, "http") {
-		link = "https://" + link
-	}
-	validURL, err := url.Parse(link)
-	if err != nil {
-		log.Fatalf("Failed to parse URL: %v", err)
-	}
 
-	fmt.Printf("Retrieveing webpage %s\n", validURL.String())
-	resp, err := getWebPage(validURL)
-	if err != nil {
-		log.Fatalf("Failed to get webpage: %v", err)
+	var resp *http.Response
+
+	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
+		validURL, err := url.Parse(link)
+		if err != nil {
+			log.Fatalf("Failed to parse URL: %v", err)
+		}
+
+		fmt.Printf("Retrieving webpage %s\n", validURL.String())
+		resp, err = getWebPage(validURL)
+		if err != nil {
+			log.Fatalf("Failed to get webpage: %v", err)
+		}
+		defer resp.Body.Close()
+	} else if strings.HasPrefix(link, "/") {
+		file, err := os.Open(link)
+		if err != nil {
+			log.Fatalf("Failed to open local file: %v", err)
+		}
+		defer file.Close()
+		resp = &http.Response{
+			Body: file,
+			Request: &http.Request{
+				URL: &url.URL{
+					Path: link,
+				},
+			},
+		}
+	} else {
+		log.Fatalf("Invalid URL: %s", link)
 	}
-	defer resp.Body.Close()
 	fmt.Println("Retrieved.")
 
-	article, filename, err := parseWebPage(resp, validURL)
+	article, filename, err := parseWebPage(resp, resp.Request.URL)
 	if err != nil {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
@@ -151,7 +169,13 @@ func parseWebPage(resp *http.Response, url *url.URL) (*readability.Article, stri
 	if err != nil {
 		return nil, "", err
 	}
-	title := article.Title
+	var title string
+	if strings.HasPrefix(url.String(), "http") {
+		title = article.Title
+	} else {
+		title = filepath.Base(url.Path)
+		title = strings.TrimSuffix(title, filepath.Ext(title))
+	}
 	return &article, titleToFilename(title), nil
 }
 
