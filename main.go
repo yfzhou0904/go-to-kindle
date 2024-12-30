@@ -48,6 +48,7 @@ func Send() {
 	var resp *http.Response
 
 	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
+		// web url
 		validURL, err := url.Parse(link)
 		if err != nil {
 			log.Fatalf("Failed to parse URL: %v", err)
@@ -59,8 +60,13 @@ func Send() {
 			log.Fatalf("Failed to get webpage: %v", err)
 		}
 		defer resp.Body.Close()
-	} else if strings.HasPrefix(link, "/") {
-		file, err := os.Open(link)
+	} else {
+		// local file
+		absPath, err := filepath.Abs(link)
+		if err != nil {
+			log.Fatalf("Failed to resolve local file path: %v", err)
+		}
+		file, err := os.Open(absPath)
 		if err != nil {
 			log.Fatalf("Failed to open local file: %v", err)
 		}
@@ -73,8 +79,6 @@ func Send() {
 				},
 			},
 		}
-	} else {
-		log.Fatalf("Invalid URL: %s", link)
 	}
 	fmt.Println("Retrieved.")
 
