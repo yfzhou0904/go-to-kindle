@@ -87,6 +87,13 @@ func Send() {
 		log.Fatalf("Failed to parse webpage: %v", err)
 	}
 
+	// Check if article contains any blocked key elements indicating parsing failure
+	for _, blockedElem := range blockedKeyElems {
+		if strings.Contains(article.Content, blockedElem) {
+			log.Fatalf("Failed to parse webpage: we have probably been blocked, pattern: '%s'", blockedElem)
+		}
+	}
+
 	fmt.Println("Filename:", filename)
 
 	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
@@ -253,3 +260,11 @@ func createFile(p string) (*os.File, error) {
 	// Create the file
 	return os.Create(p)
 }
+
+var (
+	// seeing these elements means parsing failed
+	blockedKeyElems = []string{
+		`<div id="cf-error-details">`,
+		`<title>Attention Required! | Cloudflare</title>`,
+	}
+)
