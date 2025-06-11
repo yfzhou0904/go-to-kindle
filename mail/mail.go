@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/smtp"
@@ -93,6 +94,7 @@ func SendEmailWithAttachment(smtpServer, from, password, to, subject, htmlFilePa
 		return err
 	}
 	if err = c.Auth(auth); err != nil {
+		slog.Error("email auth error", "err", err, "auth", auth)
 		return err
 	}
 
