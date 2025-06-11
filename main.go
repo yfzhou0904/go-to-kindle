@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net/http"
@@ -135,6 +136,22 @@ func Send() {
 		fmt.Println(article.Content)
 		fmt.Println()
 		log.Fatalln("Article is too short, exiting.")
+	}
+
+	// Title confirmation phase
+	fmt.Printf("Title: %s\n", article.Title)
+	fmt.Print("Press Enter to keep this title, or type a new title: ")
+	
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	customTitle := strings.TrimSpace(scanner.Text())
+	
+	// Update filename if custom title provided
+	if customTitle != "" {
+		filename = titleToFilename(customTitle)
+		fmt.Printf("Using custom title: %s\n", customTitle)
+	} else {
+		fmt.Printf("Using original title: %s\n", article.Title)
 	}
 
 	createFile(filepath.Join(baseDir(), "archive", filename))
