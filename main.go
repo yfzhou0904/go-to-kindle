@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var Conf Config = Config{
@@ -30,46 +31,42 @@ var Conf Config = Config{
 }
 
 func main() {
-	Send()
-}
-
-func Send() {
-	var err error
-
-	if err = loadConfig(); err != nil {
+	if err := loadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if len(os.Args) < 2 {
-		log.Fatal("Please provide a URL as a command line argument.")
+	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		log.Fatalf("Error running program: %v", err)
 	}
+}
 
-	link := os.Args[1]
-
+// Extracted logic from original Send function
+func fetchAndParse(input string) (*readability.Article, string, string, int, error) {
+	link := input
 	var resp *http.Response
 
 	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
 		// web url
 		validURL, err := url.Parse(link)
 		if err != nil {
-			log.Fatalf("Failed to parse URL: %v", err)
+			return nil, "", "", 0, fmt.Errorf("failed to parse URL: %v", err)
 		}
 
-		fmt.Printf("Retrieving webpage %s\n", validURL.String())
 		resp, err = getWebPage(validURL)
 		if err != nil {
-			log.Fatalf("Failed to get webpage: %v", err)
+			return nil, "", "", 0, fmt.Errorf("failed to get webpage: %v", err)
 		}
 		defer resp.Body.Close()
 	} else {
 		// local file
 		absPath, err := filepath.Abs(link)
 		if err != nil {
-			log.Fatalf("Failed to resolve local file path: %v", err)
+			return nil, "", "", 0, fmt.Errorf("failed to resolve local file path: %v", err)
 		}
 		file, err := os.Open(absPath)
 		if err != nil {
-			log.Fatalf("Failed to open local file: %v", err)
+			return nil, "", "", 0, fmt.Errorf("failed to open local file: %v", err)
 		}
 		defer file.Close()
 		resp = &http.Response{
@@ -81,25 +78,22 @@ func Send() {
 			},
 		}
 	}
-	fmt.Println("Retrieved.")
 
 	article, filename, err := parseWebPage(resp, resp.Request.URL)
 	if err != nil {
-		log.Fatalf("Failed to parse webpage: %v", err)
+		return nil, "", "", 0, fmt.Errorf("failed to parse webpage: %v", err)
 	}
 
 	// Check if article contains any blocked key elements indicating parsing failure
 	for _, blockedElem := range blockedKeyElems {
 		if strings.Contains(article.Content, blockedElem) {
-			log.Fatalf("Failed to parse webpage: we have probably been blocked, pattern: '%s'", blockedElem)
+			return nil, "", "", 0, fmt.Errorf("failed to parse webpage: we have probably been blocked, pattern: '%s'", blockedElem)
 		}
 	}
 
-	fmt.Println("Filename:", filename)
-
 	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
 	if err != nil {
-		panic(err)
+		return nil, "", "", 0, fmt.Errorf("failed to parse content: %v", err)
 	}
 	contentDoc.Find("img,source,figure,svg").Remove()
 	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
@@ -111,9 +105,8 @@ func Send() {
 	})
 	article.Content, err = contentDoc.Find("body").Html()
 	if err != nil {
-		panic(err)
+		return nil, "", "", 0, fmt.Errorf("failed to extract content: %v", err)
 	}
-	fmt.Println("Removed media.")
 
 	// language detection for better word counting
 	lang := whatlanggo.DetectLangWithOptions(article.TextContent, whatlanggo.Options{
@@ -122,50 +115,33 @@ func Send() {
 			whatlanggo.Eng: true,
 		},
 	})
-	fmt.Printf("Detected language: %s.\n", lang.String())
 	wordCount := 0
 	if lang == whatlanggo.Cmn {
 		wordCount = utf8.RuneCountInString(article.Content)
-		fmt.Printf("Parsed, length = %d.\n", wordCount/4)
 	} else {
 		wordCount = len(strings.Fields(article.Content))
-		fmt.Printf("Parsed, length = %d.\n", wordCount)
 	}
 	if wordCount < 100 {
-		fmt.Println()
-		fmt.Println(article.Content)
-		fmt.Println()
-		log.Fatalln("Article is too short, exiting.")
+		return nil, "", "", 0, fmt.Errorf("article is too short (%d words)", wordCount)
 	}
 
-	// Title confirmation phase
-	fmt.Printf("Title: %s\n", article.Title)
-	fmt.Print("Press Enter to keep this title, or type a new title: ")
-	
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	customTitle := strings.TrimSpace(scanner.Text())
-	
-	// Update filename if custom title provided
-	if customTitle != "" {
-		filename = titleToFilename(customTitle)
-		fmt.Printf("Using custom title: %s\n", customTitle)
-	} else {
-		fmt.Printf("Using original title: %s\n", article.Title)
-	}
+	return article, filename, lang.String(), wordCount, nil
+}
 
+// Process and send article
+func processAndSend(article *readability.Article, filename string) error {
 	createFile(filepath.Join(baseDir(), "archive", filename))
-	err = writeToFile(article, filepath.Join(baseDir(), "archive", filename))
+	err := writeToFile(article, filepath.Join(baseDir(), "archive", filename))
 	if err != nil {
-		log.Fatalf("Failed to write to file: %v", err)
+		return fmt.Errorf("failed to write to file: %v", err)
 	}
-	fmt.Println("Written.")
 
 	err = mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), Conf.Email.Port)
 	if err != nil {
-		log.Fatalf("Failed to send email: %v", err)
+		return fmt.Errorf("failed to send email: %v", err)
 	}
-	fmt.Println("Email sent.")
+
+	return nil
 }
 
 func getWebPage(url *url.URL) (*http.Response, error) {
