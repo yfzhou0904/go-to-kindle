@@ -62,12 +62,10 @@ func initialModel() model {
 	urlInput.Placeholder = "Enter URL or local file path..."
 	urlInput.Focus()
 	urlInput.CharLimit = 500
-	urlInput.Width = 50
 
 	// Initialize title input
 	titleInput := textinput.New()
-	titleInput.CharLimit = 200
-	titleInput.Width = 50
+	titleInput.CharLimit = 500
 
 	// Initialize spinner
 	s := spinner.New()
