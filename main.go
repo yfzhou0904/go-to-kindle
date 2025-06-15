@@ -1,22 +1,18 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
-	"unicode/utf8"
 
 	"github.com/yfzhou0904/go-to-kindle/mail"
 
-	"github.com/PuerkitoBio/goquery"
-	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var Conf Config = Config{
@@ -30,181 +26,30 @@ var Conf Config = Config{
 }
 
 func main() {
-	Send()
-}
-
-func Send() {
-	var err error
-
-	if err = loadConfig(); err != nil {
+	if err := loadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if len(os.Args) < 2 {
-		log.Fatal("Please provide a URL as a command line argument.")
+	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		log.Fatalf("Error running program: %v", err)
 	}
+}
 
-	link := os.Args[1]
-
-	var resp *http.Response
-
-	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
-		// web url
-		validURL, err := url.Parse(link)
-		if err != nil {
-			log.Fatalf("Failed to parse URL: %v", err)
-		}
-
-		fmt.Printf("Retrieving webpage %s\n", validURL.String())
-		resp, err = getWebPage(validURL)
-		if err != nil {
-			log.Fatalf("Failed to get webpage: %v", err)
-		}
-		defer resp.Body.Close()
-	} else {
-		// local file
-		absPath, err := filepath.Abs(link)
-		if err != nil {
-			log.Fatalf("Failed to resolve local file path: %v", err)
-		}
-		file, err := os.Open(absPath)
-		if err != nil {
-			log.Fatalf("Failed to open local file: %v", err)
-		}
-		defer file.Close()
-		resp = &http.Response{
-			Body: file,
-			Request: &http.Request{
-				URL: &url.URL{
-					Path: link,
-				},
-			},
-		}
-	}
-	fmt.Println("Retrieved.")
-
-	article, filename, err := parseWebPage(resp, resp.Request.URL)
-	if err != nil {
-		log.Fatalf("Failed to parse webpage: %v", err)
-	}
-
-	// Check if article contains any blocked key elements indicating parsing failure
-	for _, blockedElem := range blockedKeyElems {
-		if strings.Contains(article.Content, blockedElem) {
-			log.Fatalf("Failed to parse webpage: we have probably been blocked, pattern: '%s'", blockedElem)
-		}
-	}
-
-	fmt.Println("Filename:", filename)
-
-	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
-	if err != nil {
-		panic(err)
-	}
-	contentDoc.Find("img,source,figure,svg").Remove()
-	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
-		var buf strings.Builder
-		s.Contents().Each(func(j int, c *goquery.Selection) {
-			buf.WriteString(c.Text())
-		})
-		s.ReplaceWithHtml(buf.String())
-	})
-	article.Content, err = contentDoc.Find("body").Html()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Removed media.")
-
-	// language detection for better word counting
-	lang := whatlanggo.DetectLangWithOptions(article.TextContent, whatlanggo.Options{
-		Whitelist: map[whatlanggo.Lang]bool{
-			whatlanggo.Cmn: true,
-			whatlanggo.Eng: true,
-		},
-	})
-	fmt.Printf("Detected language: %s.\n", lang.String())
-	wordCount := 0
-	if lang == whatlanggo.Cmn {
-		wordCount = utf8.RuneCountInString(article.Content)
-		fmt.Printf("Parsed, length = %d.\n", wordCount/4)
-	} else {
-		wordCount = len(strings.Fields(article.Content))
-		fmt.Printf("Parsed, length = %d.\n", wordCount)
-	}
-	if wordCount < 100 {
-		fmt.Println()
-		fmt.Println(article.Content)
-		fmt.Println()
-		log.Fatalln("Article is too short, exiting.")
-	}
-
-	// Title confirmation phase
-	fmt.Printf("Title: %s\n", article.Title)
-	fmt.Print("Press Enter to keep this title, or type a new title: ")
-	
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	customTitle := strings.TrimSpace(scanner.Text())
-	
-	// Update filename if custom title provided
-	if customTitle != "" {
-		filename = titleToFilename(customTitle)
-		fmt.Printf("Using custom title: %s\n", customTitle)
-	} else {
-		fmt.Printf("Using original title: %s\n", article.Title)
-	}
-
+// Process and send article
+func processAndSend(article *readability.Article, filename string) error {
 	createFile(filepath.Join(baseDir(), "archive", filename))
-	err = writeToFile(article, filepath.Join(baseDir(), "archive", filename))
+	err := writeToFile(article, filepath.Join(baseDir(), "archive", filename))
 	if err != nil {
-		log.Fatalf("Failed to write to file: %v", err)
+		return fmt.Errorf("failed to write to file: %v", err)
 	}
-	fmt.Println("Written.")
 
 	err = mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), Conf.Email.Port)
 	if err != nil {
-		log.Fatalf("Failed to send email: %v", err)
-	}
-	fmt.Println("Email sent.")
-}
-
-func getWebPage(url *url.URL) (*http.Response, error) {
-	// Create a new request using http
-	req, err := http.NewRequest("GET", url.String(), nil)
-	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to send email: %v", err)
 	}
 
-	// Set the User-Agent header to mimic a normal browser
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
-
-	// Create a new http client
-	client := http.Client{
-		Transport: http.DefaultTransport.(*http.Transport).Clone(),
-	}
-
-	// Send the request using the client
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-func parseWebPage(resp *http.Response, url *url.URL) (*readability.Article, string, error) {
-	article, err := readability.FromReader(resp.Body, url)
-	if err != nil {
-		return nil, "", err
-	}
-	var title string
-	if strings.HasPrefix(url.String(), "http") {
-		title = article.Title
-	} else {
-		title = filepath.Base(url.Path)
-		title = strings.TrimSuffix(title, filepath.Ext(title))
-	}
-	return &article, titleToFilename(title), nil
+	return nil
 }
 
 const htmlTemplate = `<!DOCTYPE html>
@@ -278,10 +123,3 @@ func createFile(p string) (*os.File, error) {
 	return os.Create(p)
 }
 
-var (
-	// seeing these elements means parsing failed
-	blockedKeyElems = []string{
-		`<div id="cf-error-details">`,
-		`<title>Attention Required! | Cloudflare</title>`,
-	}
-)
