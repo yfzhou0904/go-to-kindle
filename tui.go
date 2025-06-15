@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	readability "github.com/go-shiori/go-readability"
 )
@@ -22,15 +22,17 @@ const (
 
 // Main TUI model
 type model struct {
-	state      screenState
-	urlInput   textinput.Model
-	titleInput textinput.Model
-	spinner    spinner.Model
-	article    *readability.Article
-	filename   string
-	language   string
-	wordCount  int
-	err        error
+	state            screenState
+	urlInput         textinput.Model
+	titleInput       textinput.Model
+	spinner          spinner.Model
+	article          *readability.Article
+	filename         string
+	language         string
+	wordCount        int
+	err              error
+	forceScrapingBee bool
+	checkboxFocused  bool
 }
 
 // Messages for async operations
@@ -60,12 +62,10 @@ func initialModel() model {
 	urlInput.Placeholder = "Enter URL or local file path..."
 	urlInput.Focus()
 	urlInput.CharLimit = 500
-	urlInput.Width = 50
 
 	// Initialize title input
 	titleInput := textinput.New()
-	titleInput.CharLimit = 200
-	titleInput.Width = 50
+	titleInput.CharLimit = 500
 
 	// Initialize spinner
 	s := spinner.New()
@@ -90,12 +90,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "tab", "down", "up":
+			if m.state == inputScreen {
+				m.checkboxFocused = !m.checkboxFocused
+				if m.checkboxFocused {
+					m.urlInput.Blur()
+				} else {
+					m.urlInput.Focus()
+				}
+			}
+		case " ":
+			if m.state == inputScreen && m.checkboxFocused {
+				m.forceScrapingBee = !m.forceScrapingBee
+			}
 		case "enter":
 			switch m.state {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
 					m.state = processingScreen
-					return m, tea.Batch(m.spinner.Tick, fetchArticle(m.urlInput.Value()))
+					return m, tea.Batch(m.spinner.Tick, fetchArticle(m.urlInput.Value(), m.forceScrapingBee))
 				}
 			case editScreen:
 				// Update title if changed
@@ -154,11 +167,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.state {
 	case inputScreen:
+		checkbox := "☐"
+		if m.forceScrapingBee {
+			checkbox = "☑"
+		}
+
+		checkboxStyle := subtleStyle
+		if m.checkboxFocused {
+			checkboxStyle = headerStyle
+		}
+
 		return fmt.Sprintf(
-			"%s\n\n%s\n\n%s\n",
+			"%s\n\n%s\n\n%s %s\n\n%s\n",
 			headerStyle.Render("📚 Go to Kindle"),
 			m.urlInput.View(),
-			subtleStyle.Render("Press Enter to fetch • Ctrl+C to quit"),
+			checkboxStyle.Render(checkbox),
+			checkboxStyle.Render("Force ScrapingBee (slower but more reliable)"),
+			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Ctrl+C to quit"),
 		)
 
 	case processingScreen:
@@ -170,7 +195,7 @@ func (m model) View() string {
 		)
 
 	case editScreen:
-		metadata := fmt.Sprintf("Language: %s • Words: %d • File: %s", 
+		metadata := fmt.Sprintf("Language: %s • Words: %d • File: %s",
 			m.language, m.wordCount, m.filename)
 		return fmt.Sprintf(
 			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
@@ -204,9 +229,9 @@ func (m model) View() string {
 }
 
 // Async command to fetch and parse article
-func fetchArticle(input string) tea.Cmd {
+func fetchArticle(input string, forceScrapingBee bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, err := fetchAndParse(input)
+		article, filename, language, wordCount, err := fetchAndParse(input, forceScrapingBee)
 		return fetchCompleteMsg{article: article, filename: filename, language: language, wordCount: wordCount, err: err}
 	}
 }

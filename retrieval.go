@@ -12,33 +12,43 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
-)
-
-var (
-	// seeing these elements means parsing failed
-	blockedKeyElems = []string{
-		`<div id="cf-error-details">`,
-		`<title>Attention Required! | Cloudflare</title>`,
-	}
+	"github.com/yfzhou0904/go-to-kindle/retrieval"
 )
 
 // fetchAndParse handles both web URLs and local files, returning processed article data
-func fetchAndParse(input string) (*readability.Article, string, string, int, error) {
+func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, string, string, int, error) {
 	link := input
 	var resp *http.Response
+	var err error
 
 	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
-		// web url
+		// web url - use retrieval chain
 		validURL, err := url.Parse(link)
 		if err != nil {
 			return nil, "", "", 0, fmt.Errorf("failed to parse URL: %v", err)
 		}
 
-		resp, err = getWebPage(validURL)
-		if err != nil {
-			return nil, "", "", 0, fmt.Errorf("failed to get webpage: %v", err)
+		// Create retrieval chain
+		retrievalConfig := retrieval.Config{
+			ScrapingBeeAPIKey: Conf.ScrapingBee.APIKey,
+			ForceScrapingBee:  forceScrapingBee,
 		}
-		defer resp.Body.Close()
+		chain := retrieval.NewChain(retrievalConfig)
+
+		// Attempt retrieval
+		result := chain.Retrieve(validURL)
+		if result.Error != nil {
+			return nil, "", "", 0, fmt.Errorf("failed to retrieve webpage: %v", result.Error)
+		}
+		defer result.Content.Close()
+
+		// Create http.Response-like structure for compatibility
+		resp = &http.Response{
+			Body: result.Content,
+			Request: &http.Request{
+				URL: result.URL,
+			},
+		}
 	} else {
 		// local file
 		absPath, err := filepath.Abs(link)
@@ -65,28 +75,10 @@ func fetchAndParse(input string) (*readability.Article, string, string, int, err
 		return nil, "", "", 0, fmt.Errorf("failed to parse webpage: %v", err)
 	}
 
-	// Check if article contains any blocked key elements indicating parsing failure
-	for _, blockedElem := range blockedKeyElems {
-		if strings.Contains(article.Content, blockedElem) {
-			return nil, "", "", 0, fmt.Errorf("failed to parse webpage: we have probably been blocked, pattern: '%s'", blockedElem)
-		}
-	}
-
-	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
+	// Post-process the article content
+	article, err = postProcessArticle(article)
 	if err != nil {
-		return nil, "", "", 0, fmt.Errorf("failed to parse content: %v", err)
-	}
-	contentDoc.Find("img,source,figure,svg").Remove()
-	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
-		var buf strings.Builder
-		s.Contents().Each(func(j int, c *goquery.Selection) {
-			buf.WriteString(c.Text())
-		})
-		s.ReplaceWithHtml(buf.String())
-	})
-	article.Content, err = contentDoc.Find("body").Html()
-	if err != nil {
-		return nil, "", "", 0, fmt.Errorf("failed to extract content: %v", err)
+		return nil, "", "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}
 
 	// language detection for better word counting
@@ -109,29 +101,31 @@ func fetchAndParse(input string) (*readability.Article, string, string, int, err
 	return article, filename, lang.String(), wordCount, nil
 }
 
-// getWebPage fetches a webpage with proper headers to mimic a browser
-func getWebPage(url *url.URL) (*http.Response, error) {
-	// Create a new request using http
-	req, err := http.NewRequest("GET", url.String(), nil)
+// postProcessArticle cleans up the article content by removing images and links
+func postProcessArticle(article *readability.Article) (*readability.Article, error) {
+	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse content: %v", err)
 	}
 
-	// Set the User-Agent header to mimic a normal browser
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
+	// Remove images, media, and other unwanted elements
+	contentDoc.Find("img,source,figure,svg").Remove()
 
-	// Create a new http client
-	client := http.Client{
-		Transport: http.DefaultTransport.(*http.Transport).Clone(),
-	}
+	// Replace links with their text content
+	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
+		var buf strings.Builder
+		s.Contents().Each(func(j int, c *goquery.Selection) {
+			buf.WriteString(c.Text())
+		})
+		s.ReplaceWithHtml(buf.String())
+	})
 
-	// Send the request using the client
-	resp, err := client.Do(req)
+	article.Content, err = contentDoc.Find("body").Html()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to extract content: %v", err)
 	}
 
-	return resp, nil
+	return article, nil
 }
 
 // parseWebPage uses readability to extract clean content from a webpage

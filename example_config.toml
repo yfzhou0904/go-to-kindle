@@ -4,3 +4,6 @@ port = 465
 from = "username@126.com"
 password = "123"
 to = "username@kindle.com"
+
+[scrapingbee]
+api_key = "your-scrapingbee-api-key"
