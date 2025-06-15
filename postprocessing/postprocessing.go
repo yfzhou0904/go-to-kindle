@@ -74,13 +74,10 @@ func processContent(article *readability.Article, baseURL *url.URL, includeImage
 	// Remove other media and unwanted elements (but keep processed images)
 	contentDoc.Find("svg").Remove()
 
-	// Replace links with their text content
+	// Remove <a> tags but keep their contents (text, images, etc.)
 	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
-		var buf strings.Builder
-		s.Contents().Each(func(j int, c *goquery.Selection) {
-			buf.WriteString(c.Text())
-		})
-		s.ReplaceWithHtml(buf.String())
+		html, _ := s.Html()
+		s.ReplaceWithHtml(html)
 	})
 
 	article.Content, err = contentDoc.Find("body").Html()
