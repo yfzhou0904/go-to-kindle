@@ -40,14 +40,36 @@ func main() {
 }
 
 // Process and send article
-func processAndSend(article *readability.Article, filename string) error {
-	createFile(filepath.Join(baseDir(), "archive", filename))
-	err := writeToFile(article, filepath.Join(baseDir(), "archive", filename))
-	if err != nil {
-		return fmt.Errorf("failed to write to file: %v", err)
+func processAndSend(article *readability.Article, filename string, archivePath string) error {
+	// Check if we need to update the file with a new title
+	currentArchivePath := filepath.Join(baseDir(), "archive", filename)
+	if currentArchivePath != archivePath {
+		// Title was changed, need to rewrite the file with new filename
+		_, err := createFile(currentArchivePath)
+		if err != nil {
+			return fmt.Errorf("failed to create new archive file: %v", err)
+		}
+		
+		err = writeToFile(article, currentArchivePath)
+		if err != nil {
+			return fmt.Errorf("failed to write to new archive file: %v", err)
+		}
+		
+		// Remove old file if different from new one
+		if archivePath != currentArchivePath {
+			os.Remove(archivePath)
+		}
+		
+		archivePath = currentArchivePath
+	} else {
+		// Title unchanged, but we might need to update content if title was edited
+		err := writeToFile(article, archivePath)
+		if err != nil {
+			return fmt.Errorf("failed to update archive file: %v", err)
+		}
 	}
 
-	err = mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), filepath.Join(baseDir(), "archive", filename), Conf.Email.Port)
+	err := mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), archivePath, Conf.Email.Port)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %v", err)
 	}
@@ -91,20 +113,6 @@ func writeToFile(article *readability.Article, filename string) error {
 	}
 
 	return nil
-}
-
-// replace problematic characters in page title to give a generally valid filename
-func titleToFilename(title string) string {
-	filename := strings.ReplaceAll(title, "/", "_")
-	filename = strings.ReplaceAll(filename, "\\", "_")
-	filename = strings.ReplaceAll(filename, ":", "_")
-	filename = strings.ReplaceAll(filename, "*", "_")
-	filename = strings.ReplaceAll(filename, "?", "_")
-	filename = strings.ReplaceAll(filename, "\"", "_")
-	filename = strings.ReplaceAll(filename, "<", "_")
-	filename = strings.ReplaceAll(filename, ">", "_")
-	filename = strings.ReplaceAll(filename, "|", "_")
-	return filename + ".html"
 }
 
 // user config and article data are stored in ~/.go-to-kindle
