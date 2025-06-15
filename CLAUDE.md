@@ -7,7 +7,7 @@ An interactive CLI tool that fetches web articles or local HTML files, processes
 ### Core Components
 
 - **Interactive TUI** (`tui.go`): Bubbletea-based terminal interface with 4 screen states
-- **Article Processing** (`main.go`): Web fetching, readability extraction, content cleaning  
+- **Article Processing** (`main.go`): Web fetching, readability extraction, content cleaning
 - **Email Delivery** (`mail/mail.go`): SMTP email with HTML attachment to Kindle
 - **Configuration** (`config.go`): TOML-based email settings management
 
@@ -53,12 +53,9 @@ Articles archived in `~/.go-to-kindle/archive/` as HTML files with sanitized fil
 - **Email**: Built-in net/smtp with TLS support
 - **Config**: BurntSushi/toml
 
-### Build & Run
+### Build
+`go build -o bin/go-to-kindle` or simply run `make` (same thing)
 
-```bash
-go build -o go-to-kindle
-./go-to-kindle
-```
 
 The tool launches directly into the interactive interface - no command-line arguments needed.
 

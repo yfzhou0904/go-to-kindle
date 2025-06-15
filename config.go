@@ -10,7 +10,8 @@ import (
 )
 
 type Config struct {
-	Email ConfigEmail
+	Email       ConfigEmail       `toml:"email"`
+	ScrapingBee ConfigScrapingBee `toml:"scrapingbee"`
 }
 type ConfigEmail struct {
 	SMTPServer string `toml:"smtp_server"`
@@ -18,6 +19,9 @@ type ConfigEmail struct {
 	From       string
 	Password   string
 	To         string
+}
+type ConfigScrapingBee struct {
+	APIKey string `toml:"api_key"`
 }
 
 func loadConfig() error {
