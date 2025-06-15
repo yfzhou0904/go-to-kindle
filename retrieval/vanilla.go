@@ -27,24 +27,6 @@ func (v *VanillaMethod) CanHandle(url *url.URL) bool {
 	return strings.HasPrefix(url.String(), "http://") || strings.HasPrefix(url.String(), "https://")
 }
 
-// isContentBlocked checks if the content indicates blocking
-func (v *VanillaMethod) isContentBlocked(content string) bool {
-	blockedKeyElems := []string{
-		`<div id="cf-error-details">`,
-		`<title>Attention Required! | Cloudflare</title>`,
-		`<title>Just a moment...</title>`,
-		`<div class="cf-browser-verification">`,
-		`<title>Access denied</title>`,
-		`<title>Forbidden</title>`,
-	}
-
-	for _, blockedElem := range blockedKeyElems {
-		if strings.Contains(content, blockedElem) {
-			return true
-		}
-	}
-	return false
-}
 
 // Retrieve fetches content using vanilla HTTP GET with timeout and blocking detection
 func (v *VanillaMethod) Retrieve(url *url.URL) *Result {
@@ -91,7 +73,7 @@ func (v *VanillaMethod) Retrieve(url *url.URL) *Result {
 	}
 
 	content := string(contentBytes)
-	if v.isContentBlocked(content) {
+	if isContentBlocked(content) {
 		return &Result{Error: NewFallbackError(v.Name(), "content indicates blocking (Cloudflare/JS required)", nil)}
 	}
 

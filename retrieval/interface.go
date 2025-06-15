@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 )
 
 // Result represents the result of a content retrieval operation
@@ -58,6 +59,25 @@ func NewChain(config Config) *Chain {
 	}
 
 	return chain
+}
+
+// isContentBlocked checks if the content indicates blocking (shared utility function)
+func isContentBlocked(content string) bool {
+	blockedKeyElems := []string{
+		`<div id="cf-error-details">`,
+		`<title>Attention Required! | Cloudflare</title>`,
+		`<title>Just a moment...</title>`,
+		`<div class="cf-browser-verification">`,
+		`<title>Access denied</title>`,
+		`<title>Forbidden</title>`,
+	}
+
+	for _, blockedElem := range blockedKeyElems {
+		if strings.Contains(content, blockedElem) {
+			return true
+		}
+	}
+	return false
 }
 
 // Retrieve attempts to fetch content using the chain of methods

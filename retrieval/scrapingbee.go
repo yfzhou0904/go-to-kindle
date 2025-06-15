@@ -29,19 +29,6 @@ func (s *ScrapingBeeMethod) CanHandle(url *url.URL) bool {
 	return strings.HasPrefix(url.String(), "http://") || strings.HasPrefix(url.String(), "https://")
 }
 
-// isAPIError checks if the content indicates ScrapingBee API errors
-func (s *ScrapingBeeMethod) isAPIError(content string) (bool, string) {
-	if strings.Contains(content, `"message": "Invalid API key"`) {
-		return true, "invalid API key"
-	}
-	if strings.Contains(content, `"message": "Quota exceeded"`) {
-		return true, "API quota exceeded"
-	}
-	if strings.Contains(content, `"error":`) {
-		return true, "API error"
-	}
-	return false, ""
-}
 
 // Retrieve fetches content using ScrapingBee API with timeout and error detection
 func (s *ScrapingBeeMethod) Retrieve(targetURL *url.URL) *Result {
@@ -91,8 +78,8 @@ func (s *ScrapingBeeMethod) Retrieve(targetURL *url.URL) *Result {
 	}
 
 	content := string(contentBytes)
-	if isError, reason := s.isAPIError(content); isError {
-		return &Result{Error: NewFallbackError(s.Name(), reason, nil)}
+	if isContentBlocked(content) {
+		return &Result{Error: NewFallbackError(s.Name(), "content indicates blocking (Cloudflare/JS required)", nil)}
 	}
 
 	// Return successful result
