@@ -50,8 +50,9 @@ func fetchAndParse(input string, includeImages bool, forceScrapingBee bool) (*re
 			},
 		}
 	} else {
-		// local file
-		absPath, err := filepath.Abs(link)
+		// local file - handle escaped whitespace
+		unescapedPath := strings.ReplaceAll(link, "\\ ", " ")
+		absPath, err := filepath.Abs(unescapedPath)
 		if err != nil {
 			return nil, "", "", 0, 0, "", fmt.Errorf("failed to resolve local file path: %v", err)
 		}
