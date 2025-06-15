@@ -226,13 +226,16 @@ func (m model) View() string {
 		)
 
 	case editScreen:
+		// Make file path clickable using OSC 8 hyperlink escape sequence
+		clickableFilePath := fmt.Sprintf("\033]8;;file://%s\033\\%s\033]8;;\033\\", m.archivePath, m.archivePath)
+
 		var metadata string
 		if m.includeImages && m.imageCount > 0 {
 			metadata = fmt.Sprintf("Language: %s • Words: %d • Images: %d • File: %s",
-				m.language, m.wordCount, m.imageCount, m.archivePath)
+				m.language, m.wordCount, m.imageCount, clickableFilePath)
 		} else {
 			metadata = fmt.Sprintf("Language: %s • Words: %d • File: %s",
-				m.language, m.wordCount, m.archivePath)
+				m.language, m.wordCount, clickableFilePath)
 		}
 		return fmt.Sprintf(
 			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
