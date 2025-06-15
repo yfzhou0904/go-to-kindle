@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 )
 
 // Screen states for the TUI
@@ -28,20 +29,25 @@ type model struct {
 	spinner          spinner.Model
 	article          *readability.Article
 	filename         string
+	archivePath      string
 	language         string
 	wordCount        int
+	imageCount       int
 	err              error
+	includeImages    bool
 	forceScrapingBee bool
-	checkboxFocused  bool
+	checkboxFocused  int // 0 = url input, 1 = include images, 2 = force scrapingbee
 }
 
 // Messages for async operations
 type fetchCompleteMsg struct {
-	article   *readability.Article
-	filename  string
-	language  string
-	wordCount int
-	err       error
+	article     *readability.Article
+	filename    string
+	archivePath string
+	language    string
+	wordCount   int
+	imageCount  int
+	err         error
 }
 
 type sendCompleteMsg struct {
@@ -90,34 +96,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "tab", "down", "up":
+		case "tab", "down":
 			if m.state == inputScreen {
-				m.checkboxFocused = !m.checkboxFocused
-				if m.checkboxFocused {
-					m.urlInput.Blur()
-				} else {
+				m.checkboxFocused = (m.checkboxFocused + 1) % 3
+				if m.checkboxFocused == 0 {
 					m.urlInput.Focus()
+				} else {
+					m.urlInput.Blur()
+				}
+			}
+		case "up":
+			if m.state == inputScreen {
+				m.checkboxFocused = (m.checkboxFocused + 2) % 3
+				if m.checkboxFocused == 0 {
+					m.urlInput.Focus()
+				} else {
+					m.urlInput.Blur()
 				}
 			}
 		case " ":
-			if m.state == inputScreen && m.checkboxFocused {
-				m.forceScrapingBee = !m.forceScrapingBee
+			if m.state == inputScreen {
+				if m.checkboxFocused == 1 {
+					m.includeImages = !m.includeImages
+				} else if m.checkboxFocused == 2 {
+					m.forceScrapingBee = !m.forceScrapingBee
+				}
 			}
 		case "enter":
 			switch m.state {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
 					m.state = processingScreen
-					return m, tea.Batch(m.spinner.Tick, fetchArticle(m.urlInput.Value(), m.forceScrapingBee))
+					return m, tea.Batch(m.spinner.Tick, fetchArticle(m.urlInput.Value(), m.includeImages, m.forceScrapingBee))
 				}
 			case editScreen:
 				// Update title if changed
 				if m.titleInput.Value() != "" {
 					m.article.Title = m.titleInput.Value()
-					m.filename = titleToFilename(m.titleInput.Value())
+					m.filename = postprocessing.TitleToFilename(m.titleInput.Value())
 				}
 				m.state = processingScreen
-				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename))
+				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath))
 			case completionScreen:
 				return m, tea.Quit
 			}
@@ -130,8 +149,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.article = msg.article
 			m.filename = msg.filename
+			m.archivePath = msg.archivePath
 			m.language = msg.language
 			m.wordCount = msg.wordCount
+			m.imageCount = msg.imageCount
 			m.titleInput.SetValue(msg.article.Title)
 			m.titleInput.Focus()
 			m.state = editScreen
@@ -167,23 +188,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.state {
 	case inputScreen:
-		checkbox := "☐"
-		if m.forceScrapingBee {
-			checkbox = "☑"
+		includeImagesCheckbox := "☐"
+		if m.includeImages {
+			includeImagesCheckbox = "☑"
 		}
 
-		checkboxStyle := subtleStyle
-		if m.checkboxFocused {
-			checkboxStyle = headerStyle
+		scrapingBeeCheckbox := "☐"
+		if m.forceScrapingBee {
+			scrapingBeeCheckbox = "☑"
+		}
+
+		includeImagesStyle := subtleStyle
+		scrapingBeeStyle := subtleStyle
+		if m.checkboxFocused == 1 {
+			includeImagesStyle = headerStyle
+		} else if m.checkboxFocused == 2 {
+			scrapingBeeStyle = headerStyle
 		}
 
 		return fmt.Sprintf(
-			"%s\n\n%s\n\n%s %s\n\n%s\n",
+			"%s\n\n%s\n\n%s %s\n%s %s\n\n%s\n",
 			headerStyle.Render("📚 Go to Kindle"),
 			m.urlInput.View(),
-			checkboxStyle.Render(checkbox),
-			checkboxStyle.Render("Force ScrapingBee (slower but more reliable)"),
-			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Ctrl+C to quit"),
+			includeImagesStyle.Render(includeImagesCheckbox),
+			includeImagesStyle.Render("Include Images (resized to 300px)"),
+			scrapingBeeStyle.Render(scrapingBeeCheckbox),
+			scrapingBeeStyle.Render("Force ScrapingBee (slower but more reliable)"),
+			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
 		)
 
 	case processingScreen:
@@ -195,8 +226,14 @@ func (m model) View() string {
 		)
 
 	case editScreen:
-		metadata := fmt.Sprintf("Language: %s • Words: %d • File: %s",
-			m.language, m.wordCount, m.filename)
+		var metadata string
+		if m.includeImages && m.imageCount > 0 {
+			metadata = fmt.Sprintf("Language: %s • Words: %d • Images: %d • File: %s",
+				m.language, m.wordCount, m.imageCount, m.archivePath)
+		} else {
+			metadata = fmt.Sprintf("Language: %s • Words: %d • File: %s",
+				m.language, m.wordCount, m.archivePath)
+		}
 		return fmt.Sprintf(
 			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
 			headerStyle.Render("✏️  Edit Article Title"),
@@ -229,17 +266,17 @@ func (m model) View() string {
 }
 
 // Async command to fetch and parse article
-func fetchArticle(input string, forceScrapingBee bool) tea.Cmd {
+func fetchArticle(input string, includeImages bool, forceScrapingBee bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, err := fetchAndParse(input, forceScrapingBee)
-		return fetchCompleteMsg{article: article, filename: filename, language: language, wordCount: wordCount, err: err}
+		article, filename, language, wordCount, imageCount, archivePath, err := fetchAndParse(input, includeImages, forceScrapingBee)
+		return fetchCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
 	}
 }
 
 // Async command to send article
-func sendArticle(article *readability.Article, filename string) tea.Cmd {
+func sendArticle(article *readability.Article, filename string, archivePath string) tea.Cmd {
 	return func() tea.Msg {
-		err := processAndSend(article, filename)
+		err := processAndSend(article, filename, archivePath)
 		return sendCompleteMsg{err: err}
 	}
 }

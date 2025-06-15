@@ -9,14 +9,14 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/retrieval"
 )
 
 // fetchAndParse handles both web URLs and local files, returning processed article data
-func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, string, string, int, error) {
+func fetchAndParse(input string, includeImages bool, forceScrapingBee bool) (*readability.Article, string, string, int, int, string, error) {
 	link := input
 	var resp *http.Response
 	var err error
@@ -25,7 +25,7 @@ func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, s
 		// web url - use retrieval chain
 		validURL, err := url.Parse(link)
 		if err != nil {
-			return nil, "", "", 0, fmt.Errorf("failed to parse URL: %v", err)
+			return nil, "", "", 0, 0, "", fmt.Errorf("failed to parse URL: %v", err)
 		}
 
 		// Create retrieval chain
@@ -38,7 +38,7 @@ func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, s
 		// Attempt retrieval
 		result := chain.Retrieve(validURL)
 		if result.Error != nil {
-			return nil, "", "", 0, fmt.Errorf("failed to retrieve webpage: %v", result.Error)
+			return nil, "", "", 0, 0, "", fmt.Errorf("failed to retrieve webpage: %v", result.Error)
 		}
 		defer result.Content.Close()
 
@@ -53,11 +53,11 @@ func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, s
 		// local file
 		absPath, err := filepath.Abs(link)
 		if err != nil {
-			return nil, "", "", 0, fmt.Errorf("failed to resolve local file path: %v", err)
+			return nil, "", "", 0, 0, "", fmt.Errorf("failed to resolve local file path: %v", err)
 		}
 		file, err := os.Open(absPath)
 		if err != nil {
-			return nil, "", "", 0, fmt.Errorf("failed to open local file: %v", err)
+			return nil, "", "", 0, 0, "", fmt.Errorf("failed to open local file: %v", err)
 		}
 		defer file.Close()
 		resp = &http.Response{
@@ -70,15 +70,10 @@ func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, s
 		}
 	}
 
-	article, filename, err := parseWebPage(resp, resp.Request.URL)
+	// Process the article using the new postprocessing package
+	article, filename, imageCount, err := postprocessing.ProcessArticle(resp, includeImages)
 	if err != nil {
-		return nil, "", "", 0, fmt.Errorf("failed to parse webpage: %v", err)
-	}
-
-	// Post-process the article content
-	article, err = postProcessArticle(article)
-	if err != nil {
-		return nil, "", "", 0, fmt.Errorf("failed to post-process article: %v", err)
+		return nil, "", "", 0, 0, "", fmt.Errorf("failed to process article: %v", err)
 	}
 
 	// language detection for better word counting
@@ -95,51 +90,20 @@ func fetchAndParse(input string, forceScrapingBee bool) (*readability.Article, s
 		wordCount = len(strings.Fields(article.Content))
 	}
 	if wordCount < 100 {
-		return nil, "", "", 0, fmt.Errorf("article is too short (%d words)", wordCount)
+		return nil, "", "", 0, 0, "", fmt.Errorf("article is too short (%d words)", wordCount)
 	}
 
-	return article, filename, lang.String(), wordCount, nil
-}
-
-// postProcessArticle cleans up the article content by removing images and links
-func postProcessArticle(article *readability.Article) (*readability.Article, error) {
-	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
+	// Write HTML file to archive immediately after processing
+	archivePath := filepath.Join(baseDir(), "archive", filename)
+	_, err = createFile(archivePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse content: %v", err)
+		return nil, "", "", 0, 0, "", fmt.Errorf("failed to create archive file: %v", err)
 	}
-
-	// Remove images, media, and other unwanted elements
-	contentDoc.Find("img,source,figure,svg").Remove()
-
-	// Replace links with their text content
-	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
-		var buf strings.Builder
-		s.Contents().Each(func(j int, c *goquery.Selection) {
-			buf.WriteString(c.Text())
-		})
-		s.ReplaceWithHtml(buf.String())
-	})
-
-	article.Content, err = contentDoc.Find("body").Html()
+	
+	err = writeToFile(article, archivePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract content: %v", err)
+		return nil, "", "", 0, 0, "", fmt.Errorf("failed to write to archive file: %v", err)
 	}
 
-	return article, nil
-}
-
-// parseWebPage uses readability to extract clean content from a webpage
-func parseWebPage(resp *http.Response, url *url.URL) (*readability.Article, string, error) {
-	article, err := readability.FromReader(resp.Body, url)
-	if err != nil {
-		return nil, "", err
-	}
-	var title string
-	if strings.HasPrefix(url.String(), "http") {
-		title = article.Title
-	} else {
-		title = filepath.Base(url.Path)
-		title = strings.TrimSuffix(title, filepath.Ext(title))
-	}
-	return &article, titleToFilename(title), nil
+	return article, filename, lang.String(), wordCount, imageCount, archivePath, nil
 }

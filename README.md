@@ -6,16 +6,38 @@
 
 - **Interactive Terminal UI**: Modern Bubbletea-based interface with guided workflow
 - **Multiple Sources**: Supports web URLs (http/https) and local HTML files
-- **Smart Processing**: Extracts readable content, removes media, detects language
+- **Smart Processing**: Extracts readable content, processes images, detects language
+- **Robust Retrieval**: Multi-tier fetching with ScrapingBee fallback for blocked sites
+- **Image Support**: Optional image inclusion with automatic resizing (300px max)
 - **Editable Titles**: Review and customize article titles before sending
 - **Kindle Optimized**: Generates clean HTML files perfect for Kindle reading
 - **Email Delivery**: Automatic SMTP delivery to your Kindle email address
 
+## Workflow
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   URL Input     │    │   Web Retrieval  │    │ Post-Processing │
+│                 │    │                  │    │                 │
+│ • Web URL       │───▶│ 1. Direct HTTP   │───▶│ • Readability   │
+│ • Local file    │    │ 2. ScrapingBee   │    │ • Image resize  │
+│ • Options       │    │    (fallback)    │    │ • Content clean │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                                         │
+┌─────────────────┐    ┌──────────────────┐              │
+│ Email Delivery  │◀───│ Title Editing    │◀─────────────┘
+│                 │    │                  │
+│ • SMTP send     │    │ • Review meta    │
+│ • Archive copy  │    │ • Edit title     │
+│ • Confirmation  │    │ • Word/img count │
+└─────────────────┘    └──────────────────┘
+```
+
 The tool provides an intuitive 4-step workflow:
-1. **URL Input**: Enter any web article URL or local file path
-2. **Processing**: Automatic content extraction with progress indicator
-3. **Title Edit**: Review article metadata and customize the title
-4. **Delivery**: Confirmation of successful email delivery to Kindle
+1. **Input & Options**: Enter URL/file path, toggle image inclusion and ScrapingBee
+2. **Retrieval & Processing**: Multi-tier fetching with automatic content extraction
+3. **Review & Edit**: Check metadata (language, word count, images) and customize title
+4. **Delivery**: Email to Kindle with local archive copy
 
 ## Requirements
 
@@ -78,11 +100,17 @@ Or if installed globally:
 go-to-kindle
 ```
 
-### Workflow
-1. **Enter URL or File Path**: Paste any web article URL or path to local HTML file
-2. **Wait for Processing**: The tool fetches and processes the content automatically
-3. **Review & Edit**: Check article metadata (language, word count) and edit the title if needed
-4. **Send to Kindle**: Press Enter to email the article to your Kindle device
+### Input Options
+- **URL or File Path**: Web articles or local HTML files
+- **Include Images**: Toggle to include resized images (300px max, base64 embedded)
+- **Force ScrapingBee**: Use premium service for difficult sites (slower but more reliable)
+
+### Processing Features
+- **Multi-tier Retrieval**: Direct HTTP first, ScrapingBee fallback for blocked requests
+- **Content Extraction**: Uses go-readability for clean article text
+- **Image Processing**: Downloads, resizes, and embeds images as base64 data URLs
+- **Language Detection**: Supports English and Chinese with appropriate word counting
+- **Content Cleaning**: Removes ads, navigation, and irrelevant elements
 
 ### Supported Content
 - News articles from most websites
@@ -93,14 +121,17 @@ go-to-kindle
 ### Keyboard Shortcuts
 - **Enter**: Proceed to next step
 - **Ctrl+C**: Quit at any time
-- **Tab/Shift+Tab**: Navigate between input fields (when available)
+- **Tab/↑↓**: Navigate between input fields and options
+- **Space**: Toggle checkboxes (Include Images, Force ScrapingBee)
 
 ## Troubleshooting
 
 **Config file issues**: Delete `~/.go-to-kindle/config.toml` to recreate it
 **SMTP errors**: Verify email credentials and server settings
-**Cloudflare blocks**: Tool detects and reports when websites block the request
+**Blocked websites**: Try enabling "Force ScrapingBee" option for difficult sites
+**Image issues**: Some email providers may reject large embedded images
 **Short articles**: Articles under 100 words are rejected (likely parsing failures)
+**ScrapingBee errors**: Check API key configuration if using premium features
 
 ## File Storage
 
