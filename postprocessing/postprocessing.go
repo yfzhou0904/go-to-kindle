@@ -13,6 +13,11 @@ import (
 
 // ProcessArticle handles the complete post-processing pipeline for articles
 func ProcessArticle(resp *http.Response, includeImages bool) (*readability.Article, string, int, error) {
+	return ProcessArticleWithClient(resp, includeImages, nil)
+}
+
+// ProcessArticleWithClient handles the complete post-processing pipeline for articles with custom HTTP client
+func ProcessArticleWithClient(resp *http.Response, includeImages bool, client *http.Client) (*readability.Article, string, int, error) {
 	// Parse webpage using readability
 	article, err := readability.FromReader(resp.Body, resp.Request.URL)
 	if err != nil {
@@ -31,7 +36,7 @@ func ProcessArticle(resp *http.Response, includeImages bool) (*readability.Artic
 	}
 
 	// Post-process the article content
-	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, includeImages)
+	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, includeImages, client)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}
@@ -40,7 +45,7 @@ func ProcessArticle(resp *http.Response, includeImages bool) (*readability.Artic
 }
 
 // processContent cleans up the article content by processing images and removing unwanted elements
-func processContent(article *readability.Article, baseURL *url.URL, includeImages bool) (*readability.Article, int, error) {
+func processContent(article *readability.Article, baseURL *url.URL, includeImages bool, client *http.Client) (*readability.Article, int, error) {
 	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse content: %v", err)
@@ -52,9 +57,9 @@ func processContent(article *readability.Article, baseURL *url.URL, includeImage
 	if includeImages {
 		// Use unified functions that handle both web URLs and local files
 		// For web URLs, baseURL will be valid; for local files, baseURL will be nil
-		imageCount += processImageElements(contentDoc, baseURL)
+		imageCount += processImageElements(contentDoc, baseURL, client)
 		// Also process source elements in picture tags
-		imageCount += processSourceElements(contentDoc, baseURL)
+		imageCount += processSourceElements(contentDoc, baseURL, client)
 		// Remove figures and pictures that no longer contain images (empty after processing)
 		contentDoc.Find("figure").Each(func(i int, s *goquery.Selection) {
 			if s.Find("img").Length() == 0 {

@@ -16,10 +16,15 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/nfnt/resize"
+	_ "golang.org/x/image/webp" // Register WebP format
+)
+
+const (
+	maxImageDimension = 300
 )
 
 // downloadImage downloads an image from a URL with timeout
-func downloadImage(imageURL string, baseURL *url.URL) ([]byte, string, error) {
+func downloadImage(imageURL string, baseURL *url.URL, client *http.Client) ([]byte, string, error) {
 	// Resolve relative URLs
 	parsedURL, err := url.Parse(imageURL)
 	if err != nil {
@@ -30,12 +35,24 @@ func downloadImage(imageURL string, baseURL *url.URL) ([]byte, string, error) {
 		parsedURL = baseURL.ResolveReference(parsedURL)
 	}
 
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 5 * time.Second,
+	// Use provided client or create default one with timeout
+	if client == nil {
+		client = &http.Client{
+			Timeout: 5 * time.Second,
+		}
 	}
 
-	resp, err := client.Get(parsedURL.String())
+	// Create request with proper headers
+	req, err := http.NewRequest("GET", parsedURL.String(), nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create request: %v", err)
+	}
+
+	// Add user agent and accept headers that Next.js expects
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; go-to-kindle/1.0)")
+	req.Header.Set("Accept", "image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to download image: %v", err)
 	}
@@ -64,6 +81,8 @@ func downloadImage(imageURL string, baseURL *url.URL) ([]byte, string, error) {
 			contentType = "image/png"
 		case ".gif":
 			contentType = "image/gif"
+		case ".webp":
+			contentType = "image/webp"
 		default:
 			contentType = "image/jpeg" // default fallback
 		}
@@ -73,35 +92,52 @@ func downloadImage(imageURL string, baseURL *url.URL) ([]byte, string, error) {
 }
 
 // resizeImageBytes resizes image data maintaining aspect ratio with max dimension
-func resizeImageBytes(data []byte, maxDim int) ([]byte, error) {
-	// Decode image
-	img, format, err := image.Decode(bytes.NewReader(data))
+// Returns the resized image data and the format it was encoded as
+func resizeImageBytes(data []byte, maxDim int) ([]byte, string, error) {
+	// Try to detect format first
+	_, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %v", err)
+		return nil, "", fmt.Errorf("failed to decode image config: %v", err)
+	}
+
+	// Decode image
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode image: %v", err)
 	}
 
 	// Resize maintaining aspect ratio
 	resizedImg := resize.Thumbnail(uint(maxDim), uint(maxDim), img, resize.Lanczos3)
 
-	// Encode back to bytes
+	// Determine output format and encode
 	var buf bytes.Buffer
+	var outputFormat string
+
 	switch format {
 	case "jpeg":
 		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85})
+		outputFormat = "jpeg"
 	case "png":
 		err = png.Encode(&buf, resizedImg)
+		outputFormat = "png"
 	case "gif":
 		err = gif.Encode(&buf, resizedImg, nil)
+		outputFormat = "gif"
+	case "webp":
+		// Convert WebP to JPEG since we can't encode WebP
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85})
+		outputFormat = "jpeg"
 	default:
 		// Default to JPEG for unknown formats
 		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85})
+		outputFormat = "jpeg"
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode resized image: %v", err)
+		return nil, "", fmt.Errorf("failed to encode resized image: %v", err)
 	}
 
-	return buf.Bytes(), nil
+	return buf.Bytes(), outputFormat, nil
 }
 
 // imageToBase64DataURL converts image data to base64 data URL
@@ -110,8 +146,62 @@ func imageToBase64DataURL(data []byte, contentType string) string {
 	return fmt.Sprintf("data:%s;base64,%s", contentType, base64Data)
 }
 
+// parseBase64DataURL extracts the base64 data from a data URL
+func parseBase64DataURL(dataURL string) ([]byte, error) {
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid base64 data URL format")
+	}
+
+	imageData, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 data: %v", err)
+	}
+
+	return imageData, nil
+}
+
+// processImageData resizes image data and converts it to a base64 data URL
+func processImageData(imageData []byte) (string, error) {
+	// Resize image
+	resizedData, outputFormat, err := resizeImageBytes(imageData, maxImageDimension)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to base64 data URL using actual output format
+	outputContentType := "image/" + outputFormat
+	dataURL := imageToBase64DataURL(resizedData, outputContentType)
+
+	return dataURL, nil
+}
+
+// processBase64ImageData processes a base64 data URL and returns the processed data URL
+func processBase64ImageData(src string) (string, error) {
+	// Parse base64 data from the data URL
+	imageData, err := parseBase64DataURL(src)
+	if err != nil {
+		return "", err
+	}
+
+	// Process the image data
+	return processImageData(imageData)
+}
+
+// processURLImageData downloads and processes a URL-based image and returns the processed data URL
+func processURLImageData(src string, baseURL *url.URL, client *http.Client) (string, error) {
+	// Download the image
+	imageData, _, err := downloadImage(src, baseURL, client)
+	if err != nil {
+		return "", err
+	}
+
+	// Process the image data
+	return processImageData(imageData)
+}
+
 // processImageElements processes all img elements in the document (unified for web and local)
-func processImageElements(doc *goquery.Document, baseURL *url.URL) int {
+func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
 	processedCount := 0
 	doc.Find("img").Each(func(i int, s *goquery.Selection) {
 		src, exists := s.Attr("src")
@@ -121,19 +211,26 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL) int {
 			return
 		}
 
-		var processed bool
+		var dataURL string
+		var err error
+
 		if strings.HasPrefix(src, "data:image/") {
 			// Handle base64 images (works for both web and local)
-			processed = processBase64Image(s, src)
+			dataURL, err = processBase64ImageData(src)
 		} else if baseURL != nil {
 			// Handle URL images (only for web pages with valid baseURL)
-			processed = processURLImage(s, src, baseURL)
+			dataURL, err = processURLImageData(src, baseURL, client)
 		} else {
 			// For local files, remove non-base64 images
-			processed = false
+			s.Remove()
+			return
 		}
 
-		if processed {
+		if err == nil {
+			// Update src attribute with processed image
+			s.SetAttr("src", dataURL)
+			// Remove size-related attributes
+			removeImageAttributes(s)
 			processedCount++
 		} else {
 			// Remove images that couldn't be processed
@@ -145,7 +242,7 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL) int {
 }
 
 // processSourceElements processes source elements in picture tags (unified for web and local)
-func processSourceElements(doc *goquery.Document, baseURL *url.URL) int {
+func processSourceElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
 	processedCount := 0
 	doc.Find("source").Each(func(i int, s *goquery.Selection) {
 		srcset, exists := s.Attr("srcset")
@@ -169,25 +266,22 @@ func processSourceElements(doc *goquery.Document, baseURL *url.URL) int {
 		// Extract the URL part (before any size descriptor)
 		firstURL := strings.TrimSpace(strings.Split(urls[0], " ")[0])
 
-		var processed bool
 		var dataURL string
+		var err error
 
 		if strings.HasPrefix(firstURL, "data:image/") {
 			// Handle base64 images (works for both web and local)
-			if processBase64Source(firstURL, &dataURL) {
-				processed = true
-			}
+			dataURL, err = processBase64ImageData(firstURL)
 		} else if baseURL != nil {
 			// Handle URL images (only for web pages with valid baseURL)
-			if processURLSource(firstURL, baseURL, &dataURL) {
-				processed = true
-			}
+			dataURL, err = processURLImageData(firstURL, baseURL, client)
 		} else {
 			// For local files, remove non-base64 sources
-			processed = false
+			s.Remove()
+			return
 		}
 
-		if processed {
+		if err == nil {
 			// Convert source to img element with processed image
 			s.ReplaceWithHtml(fmt.Sprintf(`<img src="%s" />`, dataURL))
 			processedCount++
@@ -198,134 +292,6 @@ func processSourceElements(doc *goquery.Document, baseURL *url.URL) int {
 	})
 
 	return processedCount
-}
-
-// processBase64Source processes a base64 source element
-func processBase64Source(src string, dataURL *string) bool {
-	// Extract base64 data and content type
-	parts := strings.SplitN(src, ",", 2)
-	if len(parts) != 2 {
-		return false
-	}
-
-	// Get content type from data URL
-	header := parts[0]
-	var contentType string
-	if strings.Contains(header, "image/jpeg") {
-		contentType = "image/jpeg"
-	} else if strings.Contains(header, "image/png") {
-		contentType = "image/png"
-	} else if strings.Contains(header, "image/gif") {
-		contentType = "image/gif"
-	} else {
-		contentType = "image/jpeg" // default
-	}
-
-	// Decode base64 data
-	imageData, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return false
-	}
-
-	// Resize image
-	resizedData, err := resizeImageBytes(imageData, 300)
-	if err != nil {
-		return false
-	}
-
-	// Convert back to base64 data URL
-	*dataURL = imageToBase64DataURL(resizedData, contentType)
-	return true
-}
-
-// processURLSource processes a URL-based source element
-func processURLSource(src string, baseURL *url.URL, dataURL *string) bool {
-	// Download and process image
-	imageData, contentType, err := downloadImage(src, baseURL)
-	if err != nil {
-		return false
-	}
-
-	// Resize image
-	resizedData, err := resizeImageBytes(imageData, 300)
-	if err != nil {
-		return false
-	}
-
-	// Convert to base64 data URL
-	*dataURL = imageToBase64DataURL(resizedData, contentType)
-	return true
-}
-
-// processBase64Image processes a base64 data URL image
-func processBase64Image(s *goquery.Selection, src string) bool {
-	// Extract base64 data and content type
-	parts := strings.SplitN(src, ",", 2)
-	if len(parts) != 2 {
-		return false
-	}
-
-	// Get content type from data URL
-	header := parts[0]
-	var contentType string
-	if strings.Contains(header, "image/jpeg") {
-		contentType = "image/jpeg"
-	} else if strings.Contains(header, "image/png") {
-		contentType = "image/png"
-	} else if strings.Contains(header, "image/gif") {
-		contentType = "image/gif"
-	} else {
-		contentType = "image/jpeg" // default
-	}
-
-	// Decode base64 data
-	imageData, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return false
-	}
-
-	// Resize image
-	resizedData, err := resizeImageBytes(imageData, 300)
-	if err != nil {
-		return false
-	}
-
-	// Convert back to base64 data URL
-	dataURL := imageToBase64DataURL(resizedData, contentType)
-
-	// Update src attribute
-	s.SetAttr("src", dataURL)
-
-	// Remove size-related attributes
-	removeImageAttributes(s)
-
-	return true
-}
-
-// processURLImage processes a URL-based image
-func processURLImage(s *goquery.Selection, src string, baseURL *url.URL) bool {
-	// Download and process image
-	imageData, contentType, err := downloadImage(src, baseURL)
-	if err != nil {
-		return false
-	}
-
-	// Resize image
-	resizedData, err := resizeImageBytes(imageData, 300)
-	if err != nil {
-		return false
-	}
-
-	// Convert to base64 data URL
-	dataURL := imageToBase64DataURL(resizedData, contentType)
-
-	// Update src attribute
-	s.SetAttr("src", dataURL)
-
-	// Remove size-related attributes
-	removeImageAttributes(s)
-
-	return true
 }
 
 // removeImageAttributes removes size and WordPress-specific attributes from images
