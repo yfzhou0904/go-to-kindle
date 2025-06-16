@@ -13,6 +13,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-shiori/go-readability v0.0.0-20250217085726-9f5bf5ca7612
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	golang.org/x/image v0.28.0
 )
 
 require (
