@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/yfzhou0904/go-to-kindle/postprocessing_test"
 )
 
 // TestConfig represents the configuration for a single test case
@@ -108,8 +110,11 @@ func runSingleTest(t *testing.T, configPath, testDataDir string) {
 	}
 	resp.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
 
-	// Process the article
-	article, filename, imageCount, err := ProcessArticle(resp, config.IncludeImages)
+	// Create mock HTTP client for image downloads
+	mockClient := postprocessing_test.CreateMockHTTPClient(testDataDir)
+
+	// Process the article with mock client
+	article, filename, imageCount, err := ProcessArticleWithClient(resp, config.IncludeImages, mockClient)
 	if err != nil {
 		t.Fatalf("ProcessArticle failed: %v", err)
 	}

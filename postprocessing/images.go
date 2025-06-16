@@ -24,7 +24,7 @@ const (
 )
 
 // downloadImage downloads an image from a URL with timeout
-func downloadImage(imageURL string, baseURL *url.URL) ([]byte, string, error) {
+func downloadImage(imageURL string, baseURL *url.URL, client *http.Client) ([]byte, string, error) {
 	// Resolve relative URLs
 	parsedURL, err := url.Parse(imageURL)
 	if err != nil {
@@ -35,9 +35,11 @@ func downloadImage(imageURL string, baseURL *url.URL) ([]byte, string, error) {
 		parsedURL = baseURL.ResolveReference(parsedURL)
 	}
 
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 5 * time.Second,
+	// Use provided client or create default one with timeout
+	if client == nil {
+		client = &http.Client{
+			Timeout: 5 * time.Second,
+		}
 	}
 
 	// Create request with proper headers
@@ -187,9 +189,9 @@ func processBase64ImageData(src string) (string, error) {
 }
 
 // processURLImageData downloads and processes a URL-based image and returns the processed data URL
-func processURLImageData(src string, baseURL *url.URL) (string, error) {
+func processURLImageData(src string, baseURL *url.URL, client *http.Client) (string, error) {
 	// Download the image
-	imageData, _, err := downloadImage(src, baseURL)
+	imageData, _, err := downloadImage(src, baseURL, client)
 	if err != nil {
 		return "", err
 	}
@@ -199,7 +201,7 @@ func processURLImageData(src string, baseURL *url.URL) (string, error) {
 }
 
 // processImageElements processes all img elements in the document (unified for web and local)
-func processImageElements(doc *goquery.Document, baseURL *url.URL) int {
+func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
 	processedCount := 0
 	doc.Find("img").Each(func(i int, s *goquery.Selection) {
 		src, exists := s.Attr("src")
@@ -217,7 +219,7 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL) int {
 			dataURL, err = processBase64ImageData(src)
 		} else if baseURL != nil {
 			// Handle URL images (only for web pages with valid baseURL)
-			dataURL, err = processURLImageData(src, baseURL)
+			dataURL, err = processURLImageData(src, baseURL, client)
 		} else {
 			// For local files, remove non-base64 images
 			s.Remove()
@@ -240,7 +242,7 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL) int {
 }
 
 // processSourceElements processes source elements in picture tags (unified for web and local)
-func processSourceElements(doc *goquery.Document, baseURL *url.URL) int {
+func processSourceElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
 	processedCount := 0
 	doc.Find("source").Each(func(i int, s *goquery.Selection) {
 		srcset, exists := s.Attr("srcset")
@@ -272,7 +274,7 @@ func processSourceElements(doc *goquery.Document, baseURL *url.URL) int {
 			dataURL, err = processBase64ImageData(firstURL)
 		} else if baseURL != nil {
 			// Handle URL images (only for web pages with valid baseURL)
-			dataURL, err = processURLImageData(firstURL, baseURL)
+			dataURL, err = processURLImageData(firstURL, baseURL, client)
 		} else {
 			// For local files, remove non-base64 sources
 			s.Remove()

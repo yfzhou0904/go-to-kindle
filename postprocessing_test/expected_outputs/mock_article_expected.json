@@ -1,0 +1,24 @@
+{
+  "testName": "mock_article",
+  "inputFile": "html_samples/mock_article.html",
+  "baseURL": "https://example.com/article",
+  "includeImages": true,
+  "expectedImageCount": 8,
+  "mustNotContain": [
+    "srcset",
+    "loading",
+    "sizes",
+    "data-orig-size",
+    "data-medium-file",
+    "data-large-file",
+    "width=\"",
+    "height=\""
+  ],
+  "mustContain": [
+    "This is a mock article designed to test",
+    "data:image/png;base64,",
+    "Image Test Cases",
+    "Base64 embedded image:",
+    "WordPress style image"
+  ]
+}
