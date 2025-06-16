@@ -115,7 +115,7 @@ func resizeImageBytes(data []byte, maxDim int) ([]byte, string, error) {
 
 	switch format {
 	case "jpeg":
-		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85})
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 100})
 		outputFormat = "jpeg"
 	case "png":
 		err = png.Encode(&buf, resizedImg)
@@ -125,11 +125,11 @@ func resizeImageBytes(data []byte, maxDim int) ([]byte, string, error) {
 		outputFormat = "gif"
 	case "webp":
 		// Convert WebP to JPEG since we can't encode WebP
-		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85})
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 100})
 		outputFormat = "jpeg"
 	default:
 		// Default to JPEG for unknown formats
-		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85})
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 100})
 		outputFormat = "jpeg"
 	}
 
