@@ -43,9 +43,8 @@ type model struct {
 
 // Messages for async operations
 type retrievalCompleteMsg struct {
-	resp        *http.Response
-	isLocalFile bool
-	err         error
+	resp *http.Response
+	err  error
 }
 
 type postProcessingCompleteMsg struct {
@@ -156,7 +155,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = completionScreen
 		} else {
 			m.state = postProcessingScreen
-			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, msg.isLocalFile, m.includeImages))
+			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.includeImages))
 		}
 		return m, nil
 
@@ -297,15 +296,15 @@ func (m model) View() string {
 // Command to retrieve content
 func retrieveContentCmd(input string, forceScrapingBee bool) tea.Cmd {
 	return func() tea.Msg {
-		resp, isLocalFile, err := retrieveContent(input, forceScrapingBee)
-		return retrievalCompleteMsg{resp: resp, isLocalFile: isLocalFile, err: err}
+		resp, err := retrieveContent(input, forceScrapingBee)
+		return retrievalCompleteMsg{resp: resp, err: err}
 	}
 }
 
 // Command to process content
-func processContentCmd(resp *http.Response, isLocalFile bool, includeImages bool) tea.Cmd {
+func processContentCmd(resp *http.Response, includeImages bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, isLocalFile, includeImages)
+		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, includeImages)
 		return postProcessingCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
 	}
 }

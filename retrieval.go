@@ -16,17 +16,15 @@ import (
 )
 
 // retrieveContent handles both web URLs and local files, returning raw HTTP response
-func retrieveContent(input string, forceScrapingBee bool) (*http.Response, bool, error) {
+func retrieveContent(input string, forceScrapingBee bool) (*http.Response, error) {
 	link := input
 	var resp *http.Response
-
-	isLocalFile := false
 
 	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
 		// web url - use retrieval chain
 		validURL, err := url.Parse(link)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to parse URL: %v", err)
+			return nil, fmt.Errorf("failed to parse URL: %v", err)
 		}
 
 		// Create retrieval chain
@@ -39,7 +37,7 @@ func retrieveContent(input string, forceScrapingBee bool) (*http.Response, bool,
 		// Attempt retrieval
 		result := chain.Retrieve(validURL)
 		if result.Error != nil {
-			return nil, false, fmt.Errorf("failed to retrieve webpage: %v", result.Error)
+			return nil, fmt.Errorf("failed to retrieve webpage: %v", result.Error)
 		}
 
 		// Create http.Response-like structure for compatibility
@@ -50,16 +48,15 @@ func retrieveContent(input string, forceScrapingBee bool) (*http.Response, bool,
 			},
 		}
 	} else {
-		// local file - handle escaped whitespace
-		isLocalFile = true
+		// local file - handle terminal autoescape for whitespace
 		unescapedPath := strings.ReplaceAll(link, "\\ ", " ")
 		absPath, err := filepath.Abs(unescapedPath)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to resolve local file path: %v", err)
+			return nil, fmt.Errorf("failed to resolve local file path: %v", err)
 		}
 		file, err := os.Open(absPath)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to open local file: %v", err)
+			return nil, fmt.Errorf("failed to open local file: %v", err)
 		}
 		resp = &http.Response{
 			Body: file,
@@ -71,11 +68,11 @@ func retrieveContent(input string, forceScrapingBee bool) (*http.Response, bool,
 		}
 	}
 
-	return resp, isLocalFile, nil
+	return resp, nil
 }
 
 // postProcessContent processes the retrieved content into a final article
-func postProcessContent(resp *http.Response, isLocalFile bool, includeImages bool) (*readability.Article, string, string, int, int, string, error) {
+func postProcessContent(resp *http.Response, includeImages bool) (*readability.Article, string, string, int, int, string, error) {
 
 	// Close the response body after processing
 	defer resp.Body.Close()
