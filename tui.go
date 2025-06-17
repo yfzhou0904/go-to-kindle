@@ -20,6 +20,7 @@ const (
 	retrievalScreen
 	postProcessingScreen
 	editScreen
+	sendingScreen
 	completionScreen
 )
 
@@ -86,10 +87,11 @@ func initialModel() model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		state:      inputScreen,
-		urlInput:   urlInput,
-		titleInput: titleInput,
-		spinner:    s,
+		state:         inputScreen,
+		urlInput:      urlInput,
+		titleInput:    titleInput,
+		spinner:       s,
+		includeImages: true,
 	}
 }
 
@@ -142,7 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.article.Title = m.titleInput.Value()
 					m.filename = postprocessing.TitleToFilename(m.titleInput.Value())
 				}
-				m.state = postProcessingScreen
+				m.state = sendingScreen
 				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath))
 			case completionScreen:
 				return m, tea.Quit
@@ -247,6 +249,14 @@ func (m model) View() string {
 			"%s %s\n\n%s\n",
 			m.spinner.View(),
 			"⚙️ Processing article...",
+			subtleStyle.Render("Ctrl+C to quit"),
+		)
+
+	case sendingScreen:
+		return fmt.Sprintf(
+			"%s %s\n\n%s\n",
+			m.spinner.View(),
+			"📧 Sending to Kindle...",
 			subtleStyle.Render("Ctrl+C to quit"),
 		)
 
