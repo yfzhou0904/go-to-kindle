@@ -6,7 +6,7 @@ An interactive CLI tool that fetches web articles or local HTML files, processes
 
 ### Core Components
 
-- **Interactive TUI** (`tui.go`): Bubbletea-based terminal interface with 4 screen states
+- **Interactive TUI** (`tui.go`): Bubbletea-based terminal interface with 5 screen states
 - **Web Retrieval** (`retrieval/`): Multi-tier fetching system with ScrapingBee fallback
 - **Post-Processing** (`postprocessing/`): Content cleaning, image processing, readability extraction
 - **Email Delivery** (`mail/mail.go`): SMTP email with HTML attachment to Kindle
@@ -15,9 +15,10 @@ An interactive CLI tool that fetches web articles or local HTML files, processes
 ### Workflow
 
 1. **Input Screen**: User enters URL/file path, toggles image inclusion and ScrapingBee options
-2. **Processing Screen**: Multi-tier retrieval, content extraction, image processing
-3. **Edit Screen**: Shows metadata (language, word count, image count, filename) with editable title
-4. **Completion Screen**: Confirms successful email delivery or shows errors
+2. **Retrieval Screen**: Multi-tier content fetching (web URLs or local files)
+3. **Post-Processing Screen**: Content extraction, readability processing, image processing
+4. **Edit Screen**: Shows metadata (language, word count, image count, filename) with editable title
+5. **Completion Screen**: Confirms successful email delivery or shows errors
 
 ### Key Features
 
@@ -95,14 +96,13 @@ Input URL/File
       |
       v
 ┌─────────────┐
-│ Fetch Chain │
-│             │  ┌──> Direct HTTP ──┐
-│ retrieval/  │──┤                   ├──> Success
-│             │  └──> ScrapingBee ───┘      |
+│ Retrieval   │  ┌──> Direct HTTP ───┐
+│ Screen      │──┤                   ├──> HTTP Response
+│ retrieval/  │  └──> ScrapingBee ───┘      |
 └─────────────┘         (fallback)          v
                                     ┌───────────────┐
-                                    │ ProcessArticle│
-                                    │               │
+                                    │ Post-Process  │
+                                    │ Screen        │
                                     │ postprocess/  │──> Clean Content
                                     │ • Readability │
                                     │ • Images      │──> Resized Images

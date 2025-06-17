@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -16,8 +17,10 @@ type screenState int
 
 const (
 	inputScreen screenState = iota
-	processingScreen
+	retrievalScreen
+	postProcessingScreen
 	editScreen
+	sendingScreen
 	completionScreen
 )
 
@@ -40,7 +43,12 @@ type model struct {
 }
 
 // Messages for async operations
-type fetchCompleteMsg struct {
+type retrievalCompleteMsg struct {
+	resp *http.Response
+	err  error
+}
+
+type postProcessingCompleteMsg struct {
 	article     *readability.Article
 	filename    string
 	archivePath string
@@ -79,10 +87,11 @@ func initialModel() model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		state:      inputScreen,
-		urlInput:   urlInput,
-		titleInput: titleInput,
-		spinner:    s,
+		state:         inputScreen,
+		urlInput:      urlInput,
+		titleInput:    titleInput,
+		spinner:       s,
+		includeImages: true,
 	}
 }
 
@@ -126,8 +135,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.state {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
-					m.state = processingScreen
-					return m, tea.Batch(m.spinner.Tick, fetchArticle(m.urlInput.Value(), m.includeImages, m.forceScrapingBee))
+					m.state = retrievalScreen
+					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.forceScrapingBee))
 				}
 			case editScreen:
 				// Update title if changed
@@ -135,14 +144,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.article.Title = m.titleInput.Value()
 					m.filename = postprocessing.TitleToFilename(m.titleInput.Value())
 				}
-				m.state = processingScreen
+				m.state = sendingScreen
 				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath))
 			case completionScreen:
 				return m, tea.Quit
 			}
 		}
 
-	case fetchCompleteMsg:
+	case retrievalCompleteMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.state = completionScreen
+		} else {
+			m.state = postProcessingScreen
+			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.includeImages))
+		}
+		return m, nil
+
+	case postProcessingCompleteMsg:
 		if msg.err != nil {
 			m.err = msg.err
 			m.state = completionScreen
@@ -217,11 +236,27 @@ func (m model) View() string {
 			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
 		)
 
-	case processingScreen:
+	case retrievalScreen:
 		return fmt.Sprintf(
 			"%s %s\n\n%s\n",
 			m.spinner.View(),
-			"Processing...",
+			"🔍 Retrieving content...",
+			subtleStyle.Render("Ctrl+C to quit"),
+		)
+
+	case postProcessingScreen:
+		return fmt.Sprintf(
+			"%s %s\n\n%s\n",
+			m.spinner.View(),
+			"⚙️ Processing article...",
+			subtleStyle.Render("Ctrl+C to quit"),
+		)
+
+	case sendingScreen:
+		return fmt.Sprintf(
+			"%s %s\n\n%s\n",
+			m.spinner.View(),
+			"📧 Sending to Kindle...",
 			subtleStyle.Render("Ctrl+C to quit"),
 		)
 
@@ -268,15 +303,23 @@ func (m model) View() string {
 	return ""
 }
 
-// Async command to fetch and parse article
-func fetchArticle(input string, includeImages bool, forceScrapingBee bool) tea.Cmd {
+// Command to retrieve content
+func retrieveContentCmd(input string, forceScrapingBee bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, imageCount, archivePath, err := fetchAndParse(input, includeImages, forceScrapingBee)
-		return fetchCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
+		resp, err := retrieveContent(input, forceScrapingBee)
+		return retrievalCompleteMsg{resp: resp, err: err}
 	}
 }
 
-// Async command to send article
+// Command to process content
+func processContentCmd(resp *http.Response, includeImages bool) tea.Cmd {
+	return func() tea.Msg {
+		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, includeImages)
+		return postProcessingCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
+	}
+}
+
+// Command to send article
 func sendArticle(article *readability.Article, filename string, archivePath string) tea.Cmd {
 	return func() tea.Msg {
 		err := processAndSend(article, filename, archivePath)

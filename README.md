@@ -17,7 +17,7 @@
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   URL Input     │    │   Web Retrieval  │    │ Post-Processing │
+│   URL Input     │    │   🔍 Retrieval   │    │ ⚙️ Processing   │
 │                 │    │                  │    │                 │
 │ • Web URL       │───▶│ 1. Direct HTTP   │───▶│ • Readability   │
 │ • Local file    │    │ 2. ScrapingBee   │    │ • Image resize  │
@@ -33,11 +33,12 @@
 └─────────────────┘    └──────────────────┘
 ```
 
-The tool provides an intuitive 4-step workflow:
+The tool provides an intuitive 5-step workflow:
 1. **Input & Options**: Enter URL/file path, toggle image inclusion and ScrapingBee
-2. **Retrieval & Processing**: Multi-tier fetching with automatic content extraction
-3. **Review & Edit**: Check metadata (language, word count, images) and customize title
-4. **Delivery**: Email to Kindle with local archive copy
+2. **Content Retrieval**: Multi-tier fetching (web URLs or local files) with progress indicator
+3. **Content Processing**: Readability extraction, image processing, and content cleaning
+4. **Review & Edit**: Check metadata (language, word count, images) and customize title
+5. **Delivery**: Email to Kindle with local archive copy
 
 ## Requirements
 
