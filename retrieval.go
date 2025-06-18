@@ -72,13 +72,13 @@ func retrieveContent(input string, forceScrapingBee bool) (*http.Response, error
 }
 
 // postProcessContent processes the retrieved content into a final article
-func postProcessContent(resp *http.Response, includeImages bool) (*readability.Article, string, string, int, int, string, error) {
+func postProcessContent(resp *http.Response, excludeImages bool) (*readability.Article, string, string, int, int, string, error) {
 
 	// Close the response body after processing
 	defer resp.Body.Close()
 
 	// Process the article using the new postprocessing package
-	article, filename, imageCount, err := postprocessing.ProcessArticle(resp, includeImages)
+	article, filename, imageCount, err := postprocessing.ProcessArticle(resp, excludeImages)
 	if err != nil {
 		return nil, "", "", 0, 0, "", fmt.Errorf("failed to process article: %v", err)
 	}

@@ -18,7 +18,7 @@ type TestConfig struct {
 	TestName           string   `json:"testName"`
 	InputFile          string   `json:"inputFile"`
 	BaseURL            string   `json:"baseURL"`
-	IncludeImages      bool     `json:"includeImages"`
+	ExcludeImages      bool     `json:"excludeImages"`
 	ExpectedImageCount int      `json:"expectedImageCount"`
 	MustNotContain     []string `json:"mustNotContain"`
 	MustContain        []string `json:"mustContain"`
@@ -114,7 +114,7 @@ func runSingleTest(t *testing.T, configPath, testDataDir string) {
 	mockClient := postprocessing_test.CreateMockHTTPClient(testDataDir)
 
 	// Process the article with mock client
-	article, filename, imageCount, err := ProcessArticleWithClient(resp, config.IncludeImages, mockClient)
+	article, filename, imageCount, err := ProcessArticleWithClient(resp, config.ExcludeImages, mockClient)
 	if err != nil {
 		t.Fatalf("ProcessArticle failed: %v", err)
 	}

@@ -12,12 +12,12 @@ import (
 )
 
 // ProcessArticle handles the complete post-processing pipeline for articles
-func ProcessArticle(resp *http.Response, includeImages bool) (*readability.Article, string, int, error) {
-	return ProcessArticleWithClient(resp, includeImages, nil)
+func ProcessArticle(resp *http.Response, excludeImages bool) (*readability.Article, string, int, error) {
+	return ProcessArticleWithClient(resp, excludeImages, nil)
 }
 
 // ProcessArticleWithClient handles the complete post-processing pipeline for articles with custom HTTP client
-func ProcessArticleWithClient(resp *http.Response, includeImages bool, client *http.Client) (*readability.Article, string, int, error) {
+func ProcessArticleWithClient(resp *http.Response, excludeImages bool, client *http.Client) (*readability.Article, string, int, error) {
 	// Parse webpage using readability
 	article, err := readability.FromReader(resp.Body, resp.Request.URL)
 	if err != nil {
@@ -36,7 +36,7 @@ func ProcessArticleWithClient(resp *http.Response, includeImages bool, client *h
 	}
 
 	// Post-process the article content
-	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, includeImages, client)
+	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, client)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}
@@ -45,7 +45,7 @@ func ProcessArticleWithClient(resp *http.Response, includeImages bool, client *h
 }
 
 // processContent cleans up the article content by processing images and removing unwanted elements
-func processContent(article *readability.Article, baseURL *url.URL, includeImages bool, client *http.Client) (*readability.Article, int, error) {
+func processContent(article *readability.Article, baseURL *url.URL, excludeImages bool, client *http.Client) (*readability.Article, int, error) {
 	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse content: %v", err)
@@ -53,8 +53,8 @@ func processContent(article *readability.Article, baseURL *url.URL, includeImage
 
 	imageCount := 0
 
-	// Process images based on includeImages flag
-	if includeImages {
+	// Process images based on excludeImages flag
+	if !excludeImages {
 		// Use unified functions that handle both web URLs and local files
 		// For web URLs, baseURL will be valid; for local files, baseURL will be nil
 		imageCount += processImageElements(contentDoc, baseURL, client)
