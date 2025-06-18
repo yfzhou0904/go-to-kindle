@@ -2,7 +2,7 @@
   "testName": "mock_article",
   "inputFile": "html_samples/mock_article.html",
   "baseURL": "https://example.com/article",
-  "includeImages": true,
+  "excludeImages": false,
   "expectedImageCount": 8,
   "mustNotContain": [
     "srcset",

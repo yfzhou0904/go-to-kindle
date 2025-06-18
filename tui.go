@@ -37,7 +37,7 @@ type model struct {
 	wordCount        int
 	imageCount       int
 	err              error
-	includeImages    bool
+	excludeImages    bool
 	forceScrapingBee bool
 	checkboxFocused  int // 0 = url input, 1 = include images, 2 = force scrapingbee
 }
@@ -91,7 +91,7 @@ func initialModel() model {
 		urlInput:      urlInput,
 		titleInput:    titleInput,
 		spinner:       s,
-		includeImages: true,
+		excludeImages: false,
 	}
 }
 
@@ -126,7 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case " ":
 			if m.state == inputScreen {
 				if m.checkboxFocused == 1 {
-					m.includeImages = !m.includeImages
+					m.excludeImages = !m.excludeImages
 				} else if m.checkboxFocused == 2 {
 					m.forceScrapingBee = !m.forceScrapingBee
 				}
@@ -157,7 +157,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = completionScreen
 		} else {
 			m.state = postProcessingScreen
-			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.includeImages))
+			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.excludeImages))
 		}
 		return m, nil
 
@@ -207,9 +207,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	switch m.state {
 	case inputScreen:
-		includeImagesCheckbox := "☐"
-		if m.includeImages {
-			includeImagesCheckbox = "☑"
+		excludeImagesCheckbox := "☐"
+		if m.excludeImages {
+			excludeImagesCheckbox = "☑"
 		}
 
 		scrapingBeeCheckbox := "☐"
@@ -217,10 +217,10 @@ func (m model) View() string {
 			scrapingBeeCheckbox = "☑"
 		}
 
-		includeImagesStyle := subtleStyle
+		excludeImagesStyle := subtleStyle
 		scrapingBeeStyle := subtleStyle
 		if m.checkboxFocused == 1 {
-			includeImagesStyle = headerStyle
+			excludeImagesStyle = headerStyle
 		} else if m.checkboxFocused == 2 {
 			scrapingBeeStyle = headerStyle
 		}
@@ -229,8 +229,8 @@ func (m model) View() string {
 			"%s\n\n%s\n\n%s %s\n%s %s\n\n%s\n",
 			headerStyle.Render("📚 Go to Kindle"),
 			m.urlInput.View(),
-			includeImagesStyle.Render(includeImagesCheckbox),
-			includeImagesStyle.Render("Include Images (resized to 300px)"),
+			excludeImagesStyle.Render(excludeImagesCheckbox),
+			excludeImagesStyle.Render("Exclude Images (resized to 300px)"),
 			scrapingBeeStyle.Render(scrapingBeeCheckbox),
 			scrapingBeeStyle.Render("Force ScrapingBee (slower but more reliable)"),
 			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
@@ -265,7 +265,7 @@ func (m model) View() string {
 		clickableFilePath := fmt.Sprintf("\033]8;;file://%s\033\\%s\033]8;;\033\\", m.archivePath, m.archivePath)
 
 		var metadata string
-		if m.includeImages && m.imageCount > 0 {
+		if !m.excludeImages && m.imageCount > 0 {
 			metadata = fmt.Sprintf("Language: %s • Words: %d • Images: %d • File: %s",
 				m.language, m.wordCount, m.imageCount, clickableFilePath)
 		} else {
@@ -312,9 +312,9 @@ func retrieveContentCmd(input string, forceScrapingBee bool) tea.Cmd {
 }
 
 // Command to process content
-func processContentCmd(resp *http.Response, includeImages bool) tea.Cmd {
+func processContentCmd(resp *http.Response, excludeImages bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, includeImages)
+		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, excludeImages)
 		return postProcessingCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
 	}
 }
