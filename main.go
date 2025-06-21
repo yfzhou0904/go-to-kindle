@@ -29,11 +29,33 @@ var Conf Config = Config{
 }
 
 func main() {
+	// Parse command line arguments
+	args := os.Args[1:]
+
+	// Handle help flag
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			fmt.Println(helpMessage)
+			os.Exit(0)
+		}
+	}
+
+	// Extract URL argument (ignore extras)
+	var url string
+	if len(args) > 0 {
+		url = args[0]
+	}
+
 	if err := loadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	var modelOpts []ModelOption
+	if url != "" {
+		modelOpts = append(modelOpts, WithURL(url))
+	}
+
+	p := tea.NewProgram(initialModel(modelOpts...), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatalf("Error running program: %v", err)
 	}
@@ -49,17 +71,17 @@ func processAndSend(article *readability.Article, filename string, archivePath s
 		if err != nil {
 			return fmt.Errorf("failed to create new archive file: %v", err)
 		}
-		
+
 		err = writeToFile(article, currentArchivePath)
 		if err != nil {
 			return fmt.Errorf("failed to write to new archive file: %v", err)
 		}
-		
+
 		// Remove old file if different from new one
 		if archivePath != currentArchivePath {
 			os.Remove(archivePath)
 		}
-		
+
 		archivePath = currentArchivePath
 	} else {
 		// Title unchanged, but we might need to update content if title was edited

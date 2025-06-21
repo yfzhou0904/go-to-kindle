@@ -70,7 +70,17 @@ var (
 	subtleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4"))
 )
 
-func initialModel() model {
+// ModelOption represents a configuration option for initialModel
+type ModelOption func(*model)
+
+// WithURL sets the initial URL value
+func WithURL(url string) ModelOption {
+	return func(m *model) {
+		m.urlInput.SetValue(url)
+	}
+}
+
+func initialModel(opts ...ModelOption) model {
 	// Initialize URL input
 	urlInput := textinput.New()
 	urlInput.Placeholder = "Enter URL or local file path..."
@@ -86,13 +96,20 @@ func initialModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	return model{
+	m := model{
 		state:         inputScreen,
 		urlInput:      urlInput,
 		titleInput:    titleInput,
 		spinner:       s,
 		excludeImages: false,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -131,6 +148,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.forceScrapingBee = !m.forceScrapingBee
 				}
 			}
+		case "esc":
+			if m.state == completionScreen {
+				return m, tea.Quit
+			}
 		case "enter":
 			switch m.state {
 			case inputScreen:
@@ -147,7 +168,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = sendingScreen
 				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath))
 			case completionScreen:
-				return m, tea.Quit
+				// Reset to initial state and return to input screen
+				initial := initialModel()
+				return initial, initial.spinner.Tick
 			}
 		}
 
@@ -279,7 +302,7 @@ func (m model) View() string {
 			subtleStyle.Render(metadata),
 			m.titleInput.View(),
 			subtleStyle.Render("Press Enter to send to Kindle • Edit title or keep as-is"),
-			subtleStyle.Render("Ctrl+C or q to quit"),
+			subtleStyle.Render("Ctrl+C to quit"),
 		)
 
 	case completionScreen:
@@ -288,14 +311,14 @@ func (m model) View() string {
 				"%s\n\n%s\n\n%s\n",
 				errorStyle.Render("❌ Error"),
 				m.err.Error(),
-				subtleStyle.Render("Press Enter or Ctrl+C to quit"),
+				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		} else {
 			return fmt.Sprintf(
 				"%s\n\n%s\n\n%s\n",
 				successStyle.Render("✅ Success!"),
 				"Article sent to your Kindle successfully.",
-				subtleStyle.Render("Press Enter or Ctrl+C to quit"),
+				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		}
 	}
