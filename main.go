@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/yfzhou0904/go-to-kindle/mail"
+	"github.com/yfzhou0904/go-to-kindle/util"
 
 	readability "github.com/go-shiori/go-readability"
 
@@ -30,20 +32,21 @@ var Conf Config = Config{
 
 func main() {
 	// Parse command line arguments
-	args := os.Args[1:]
-
-	// Handle help flag
-	for _, arg := range args {
-		if arg == "--help" || arg == "-h" {
-			fmt.Println(helpMessage)
-			os.Exit(0)
-		}
+	debug := flag.Bool("debug", false, "Enable debug mode to save intermediate HTML files")
+	
+	// Set custom usage function
+	flag.Usage = func() {
+		fmt.Println(helpMessage)
+		fmt.Println("\nFlags:")
+		flag.PrintDefaults()
 	}
+	
+	flag.Parse()
 
-	// Extract URL argument (ignore extras)
+	// Extract URL argument from non-flag arguments
 	var url string
-	if len(args) > 0 {
-		url = args[0]
+	if flag.NArg() > 0 {
+		url = flag.Arg(0)
 	}
 
 	if err := loadConfig(); err != nil {
@@ -53,6 +56,9 @@ func main() {
 	var modelOpts []ModelOption
 	if url != "" {
 		modelOpts = append(modelOpts, WithURL(url))
+	}
+	if *debug {
+		modelOpts = append(modelOpts, WithDebugFlag(*debug))
 	}
 
 	p := tea.NewProgram(initialModel(modelOpts...), tea.WithAltScreen())
@@ -64,7 +70,7 @@ func main() {
 // Process and send article
 func processAndSend(article *readability.Article, filename string, archivePath string) error {
 	// Check if we need to update the file with a new title
-	currentArchivePath := filepath.Join(baseDir(), "archive", filename)
+	currentArchivePath := filepath.Join(util.BaseDir(), "archive", filename)
 	if currentArchivePath != archivePath {
 		// Title was changed, need to rewrite the file with new filename
 		_, err := createFile(currentArchivePath)
@@ -137,14 +143,6 @@ func writeToFile(article *readability.Article, filename string) error {
 	return nil
 }
 
-// user config and article data are stored in ~/.go-to-kindle
-func baseDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return filepath.Join(home, ".go-to-kindle")
-}
 
 func createFile(p string) (*os.File, error) {
 	// Create directories if they do not exist

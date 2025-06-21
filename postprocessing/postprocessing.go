@@ -1,14 +1,18 @@
 package postprocessing
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
 // ProcessArticle handles the complete post-processing pipeline for articles
@@ -18,10 +22,27 @@ func ProcessArticle(resp *http.Response, excludeImages bool) (*readability.Artic
 
 // ProcessArticleWithClient handles the complete post-processing pipeline for articles with custom HTTP client
 func ProcessArticleWithClient(resp *http.Response, excludeImages bool, client *http.Client) (*readability.Article, string, int, error) {
+	ctx := context.Background()
+	return ProcessArticleWithContext(ctx, resp, excludeImages)
+}
+
+// handles the complete post-processing pipeline with context support
+func ProcessArticleWithContext(ctx context.Context, resp *http.Response, excludeImages bool) (*readability.Article, string, int, error) {
 	// Parse webpage using readability
 	article, err := readability.FromReader(resp.Body, resp.Request.URL)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to parse webpage: %v", err)
+	}
+
+	// Save readability-parsed content for debug if needed
+	if util.Debug(ctx) {
+		timestamp := time.Now().Format("20060102150405")
+		archiveDir := filepath.Join(util.BaseDir(), "archive")
+		parsedDebugPath := filepath.Join(archiveDir, fmt.Sprintf("%s_debug_parsed.html", timestamp))
+		err = os.WriteFile(parsedDebugPath, []byte(article.Content), 0644)
+		if err != nil {
+			fmt.Printf("Warning: failed to save debug parsed file: %v\n", err)
+		}
 	}
 
 	// Generate filename from title or path
@@ -36,7 +57,7 @@ func ProcessArticleWithClient(resp *http.Response, excludeImages bool, client *h
 	}
 
 	// Post-process the article content
-	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, client)
+	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, nil)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}

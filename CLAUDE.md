@@ -10,6 +10,7 @@ Interactive CLI tool that fetches web articles or local HTML files, processes th
 - **Post-Processing** (`postprocessing/`): Content extraction and image processing
 - **Email** (`mail/mail.go`): SMTP delivery with HTML attachments
 - **Config** (`config.go`): TOML-based settings management
+- **Utilities** (`util/`): Shared utilities including debug context and base directory helpers
 
 ### Data Flow
 ```

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
+	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
 // Screen states for the TUI
@@ -39,6 +41,7 @@ type model struct {
 	err              error
 	excludeImages    bool
 	forceScrapingBee bool
+	debug            bool
 	checkboxFocused  int // 0 = url input, 1 = include images, 2 = force scrapingbee
 }
 
@@ -77,6 +80,13 @@ type ModelOption func(*model)
 func WithURL(url string) ModelOption {
 	return func(m *model) {
 		m.urlInput.SetValue(url)
+	}
+}
+
+// WithDebugFlag enables debug mode
+func WithDebugFlag(debug bool) ModelOption {
+	return func(m *model) {
+		m.debug = debug
 	}
 }
 
@@ -142,9 +152,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case " ":
 			if m.state == inputScreen {
-				if m.checkboxFocused == 1 {
+				switch m.checkboxFocused {
+				case 1:
 					m.excludeImages = !m.excludeImages
-				} else if m.checkboxFocused == 2 {
+				case 2:
 					m.forceScrapingBee = !m.forceScrapingBee
 				}
 			}
@@ -157,7 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
 					m.state = retrievalScreen
-					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.forceScrapingBee))
+					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.forceScrapingBee, m.debug))
 				}
 			case editScreen:
 				// Update title if changed
@@ -180,7 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = completionScreen
 		} else {
 			m.state = postProcessingScreen
-			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.excludeImages))
+			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.excludeImages, m.debug))
 		}
 		return m, nil
 
@@ -242,9 +253,10 @@ func (m model) View() string {
 
 		excludeImagesStyle := subtleStyle
 		scrapingBeeStyle := subtleStyle
-		if m.checkboxFocused == 1 {
+		switch m.checkboxFocused {
+		case 1:
 			excludeImagesStyle = headerStyle
-		} else if m.checkboxFocused == 2 {
+		case 2:
 			scrapingBeeStyle = headerStyle
 		}
 
@@ -327,17 +339,25 @@ func (m model) View() string {
 }
 
 // Command to retrieve content
-func retrieveContentCmd(input string, forceScrapingBee bool) tea.Cmd {
+func retrieveContentCmd(input string, forceScrapingBee bool, debug bool) tea.Cmd {
 	return func() tea.Msg {
-		resp, err := retrieveContent(input, forceScrapingBee)
+		ctx := context.Background()
+		if debug {
+			ctx = util.WithDebug(ctx, debug)
+		}
+		resp, err := retrieveContent(ctx, input, forceScrapingBee)
 		return retrievalCompleteMsg{resp: resp, err: err}
 	}
 }
 
 // Command to process content
-func processContentCmd(resp *http.Response, excludeImages bool) tea.Cmd {
+func processContentCmd(resp *http.Response, excludeImages bool, debug bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, excludeImages)
+		ctx := context.Background()
+		if debug {
+			ctx = util.WithDebug(ctx, debug)
+		}
+		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(ctx, resp, excludeImages)
 		return postProcessingCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
 	}
 }
