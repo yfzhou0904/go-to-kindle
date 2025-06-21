@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
 type Config struct {
@@ -25,7 +26,7 @@ type ConfigScrapingBee struct {
 }
 
 func loadConfig() error {
-	filepath := filepath.Join(baseDir(), "config.toml")
+	filepath := filepath.Join(util.BaseDir(), "config.toml")
 
 	// init example config file if does not exist
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {

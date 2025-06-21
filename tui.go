@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
+	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
 // Screen states for the TUI
@@ -39,6 +41,7 @@ type model struct {
 	err              error
 	excludeImages    bool
 	forceScrapingBee bool
+	debug            bool
 	checkboxFocused  int // 0 = url input, 1 = include images, 2 = force scrapingbee
 }
 
@@ -70,7 +73,24 @@ var (
 	subtleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4"))
 )
 
-func initialModel() model {
+// ModelOption represents a configuration option for initialModel
+type ModelOption func(*model)
+
+// WithURL sets the initial URL value
+func WithURL(url string) ModelOption {
+	return func(m *model) {
+		m.urlInput.SetValue(url)
+	}
+}
+
+// WithDebugFlag enables debug mode
+func WithDebugFlag(debug bool) ModelOption {
+	return func(m *model) {
+		m.debug = debug
+	}
+}
+
+func initialModel(opts ...ModelOption) model {
 	// Initialize URL input
 	urlInput := textinput.New()
 	urlInput.Placeholder = "Enter URL or local file path..."
@@ -86,13 +106,20 @@ func initialModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	return model{
+	m := model{
 		state:         inputScreen,
 		urlInput:      urlInput,
 		titleInput:    titleInput,
 		spinner:       s,
 		excludeImages: false,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -125,18 +152,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case " ":
 			if m.state == inputScreen {
-				if m.checkboxFocused == 1 {
+				switch m.checkboxFocused {
+				case 1:
 					m.excludeImages = !m.excludeImages
-				} else if m.checkboxFocused == 2 {
+				case 2:
 					m.forceScrapingBee = !m.forceScrapingBee
 				}
+			}
+		case "esc":
+			if m.state == completionScreen {
+				return m, tea.Quit
 			}
 		case "enter":
 			switch m.state {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
 					m.state = retrievalScreen
-					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.forceScrapingBee))
+					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.forceScrapingBee, m.debug))
 				}
 			case editScreen:
 				// Update title if changed
@@ -147,7 +179,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = sendingScreen
 				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath))
 			case completionScreen:
-				return m, tea.Quit
+				// Reset to initial state and return to input screen
+				initial := initialModel()
+				return initial, initial.spinner.Tick
 			}
 		}
 
@@ -157,7 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = completionScreen
 		} else {
 			m.state = postProcessingScreen
-			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.excludeImages))
+			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.excludeImages, m.debug))
 		}
 		return m, nil
 
@@ -219,9 +253,10 @@ func (m model) View() string {
 
 		excludeImagesStyle := subtleStyle
 		scrapingBeeStyle := subtleStyle
-		if m.checkboxFocused == 1 {
+		switch m.checkboxFocused {
+		case 1:
 			excludeImagesStyle = headerStyle
-		} else if m.checkboxFocused == 2 {
+		case 2:
 			scrapingBeeStyle = headerStyle
 		}
 
@@ -279,7 +314,7 @@ func (m model) View() string {
 			subtleStyle.Render(metadata),
 			m.titleInput.View(),
 			subtleStyle.Render("Press Enter to send to Kindle • Edit title or keep as-is"),
-			subtleStyle.Render("Ctrl+C or q to quit"),
+			subtleStyle.Render("Ctrl+C to quit"),
 		)
 
 	case completionScreen:
@@ -288,14 +323,14 @@ func (m model) View() string {
 				"%s\n\n%s\n\n%s\n",
 				errorStyle.Render("❌ Error"),
 				m.err.Error(),
-				subtleStyle.Render("Press Enter or Ctrl+C to quit"),
+				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		} else {
 			return fmt.Sprintf(
 				"%s\n\n%s\n\n%s\n",
 				successStyle.Render("✅ Success!"),
 				"Article sent to your Kindle successfully.",
-				subtleStyle.Render("Press Enter or Ctrl+C to quit"),
+				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		}
 	}
@@ -304,17 +339,25 @@ func (m model) View() string {
 }
 
 // Command to retrieve content
-func retrieveContentCmd(input string, forceScrapingBee bool) tea.Cmd {
+func retrieveContentCmd(input string, forceScrapingBee bool, debug bool) tea.Cmd {
 	return func() tea.Msg {
-		resp, err := retrieveContent(input, forceScrapingBee)
+		ctx := context.Background()
+		if debug {
+			ctx = util.WithDebug(ctx, debug)
+		}
+		resp, err := retrieveContent(ctx, input, forceScrapingBee)
 		return retrievalCompleteMsg{resp: resp, err: err}
 	}
 }
 
 // Command to process content
-func processContentCmd(resp *http.Response, excludeImages bool) tea.Cmd {
+func processContentCmd(resp *http.Response, excludeImages bool, debug bool) tea.Cmd {
 	return func() tea.Msg {
-		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(resp, excludeImages)
+		ctx := context.Background()
+		if debug {
+			ctx = util.WithDebug(ctx, debug)
+		}
+		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(ctx, resp, excludeImages)
 		return postProcessingCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
 	}
 }
