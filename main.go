@@ -12,7 +12,7 @@ import (
 	"github.com/yfzhou0904/go-to-kindle/mail"
 	"github.com/yfzhou0904/go-to-kindle/util"
 
-	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/readability"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

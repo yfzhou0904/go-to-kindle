@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/readability"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/util"
 )

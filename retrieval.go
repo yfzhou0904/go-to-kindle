@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/abadojack/whatlanggo"
-	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/readability"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/retrieval"
 	"github.com/yfzhou0904/go-to-kindle/util"

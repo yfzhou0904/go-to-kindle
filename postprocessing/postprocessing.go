@@ -3,6 +3,7 @@ package postprocessing
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/readability"
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
@@ -28,8 +29,19 @@ func ProcessArticleWithClient(resp *http.Response, excludeImages bool, client *h
 
 // handles the complete post-processing pipeline with context support
 func ProcessArticleWithContext(ctx context.Context, resp *http.Response, excludeImages bool) (*readability.Article, string, int, error) {
-	// Parse webpage using readability
-	article, err := readability.FromReader(resp.Body, resp.Request.URL)
+	// Read HTML content from response body
+	htmlContent, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("failed to read response body: %v", err)
+	}
+	
+	// Parse webpage using Sobek + Mozilla readability
+	parser, err := readability.NewParser()
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("failed to create readability parser: %v", err)
+	}
+	
+	article, err := parser.Parse(string(htmlContent), resp.Request.URL)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to parse webpage: %v", err)
 	}
@@ -57,7 +69,7 @@ func ProcessArticleWithContext(ctx context.Context, resp *http.Response, exclude
 	}
 
 	// Post-process the article content
-	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, nil)
+	processedArticle, imageCount, err := processContent(article, resp.Request.URL, excludeImages, nil)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}
