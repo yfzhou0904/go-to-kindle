@@ -33,14 +33,14 @@ var Conf Config = Config{
 func main() {
 	// Parse command line arguments
 	debug := flag.Bool("debug", false, "Enable debug mode to save intermediate HTML files")
-	
+
 	// Set custom usage function
 	flag.Usage = func() {
 		fmt.Println(helpMessage)
 		fmt.Println("\nFlags:")
 		flag.PrintDefaults()
 	}
-	
+
 	flag.Parse()
 
 	// Extract URL argument from non-flag arguments
@@ -105,18 +105,6 @@ func processAndSend(article *readability.Article, filename string, archivePath s
 	return nil
 }
 
-const htmlTemplate = `<!DOCTYPE html>
-<html>
-<head>
-	<title>{{.Title}}</title>
-	<meta name="author" content="{{.Author}}">
-</head>
-<body>
-	{{.Content}}
-</body>
-</html>
-`
-
 type HtmlData struct {
 	Title   string
 	Content string
@@ -143,7 +131,6 @@ func writeToFile(article *readability.Article, filename string) error {
 	return nil
 }
 
-
 func createFile(p string) (*os.File, error) {
 	// Create directories if they do not exist
 	if err := os.MkdirAll(filepath.Dir(p), 0770); err != nil {
@@ -153,3 +140,15 @@ func createFile(p string) (*os.File, error) {
 	// Create the file
 	return os.Create(p)
 }
+
+const htmlTemplate = `<!DOCTYPE html>
+<html>
+<head>
+	<title>{{.Title}}</title>
+	<meta name="author" content="{{.Author}}">
+</head>
+<body>
+	{{.Content}}
+</body>
+</html>
+`
