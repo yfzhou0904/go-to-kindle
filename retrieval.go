@@ -19,6 +19,20 @@ import (
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
+// unescapeFilePath removes terminal auto-escaping from file paths
+func unescapeFilePath(path string) string {
+	// Handle common auto-escaped characters in macOS terminal
+	path = strings.ReplaceAll(path, "\\ ", " ")
+	path = strings.ReplaceAll(path, "\\(", "(")
+	path = strings.ReplaceAll(path, "\\)", ")")
+	path = strings.ReplaceAll(path, "\\[", "[")
+	path = strings.ReplaceAll(path, "\\]", "]")
+	path = strings.ReplaceAll(path, "\\&", "&")
+	path = strings.ReplaceAll(path, "\\;", ";")
+	path = strings.ReplaceAll(path, "\\'", "'")
+	return path
+}
+
 // retrieveContent handles both web URLs and local files, returning raw HTTP response
 func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (*http.Response, error) {
 	link := input
@@ -52,13 +66,35 @@ func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (
 			},
 		}
 	} else {
-		// local file - handle terminal autoescape for whitespace
-		unescapedPath := strings.ReplaceAll(link, "\\ ", " ")
-		absPath, err := filepath.Abs(unescapedPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve local file path: %v", err)
+		// local file - handle both drag-drop and copy-paste (both may be escaped)
+		var file *os.File
+		var err error
+		var absPath string
+		
+		// Clean input - remove any leading/trailing whitespace and handle quotes
+		cleanLink := strings.TrimSpace(link)
+		// Remove surrounding quotes if present (sometimes drag-drop adds them)
+		if (strings.HasPrefix(cleanLink, `"`) && strings.HasSuffix(cleanLink, `"`)) ||
+		   (strings.HasPrefix(cleanLink, `'`) && strings.HasSuffix(cleanLink, `'`)) {
+			cleanLink = cleanLink[1 : len(cleanLink)-1]
 		}
-		file, err := os.Open(absPath)
+		
+		// Try unescaping first (handles most terminal input cases)
+		unescapedPath := unescapeFilePath(cleanLink)
+		absPath, err = filepath.Abs(unescapedPath)
+		if err == nil {
+			file, err = os.Open(absPath)
+		}
+		
+		// If that fails, try as-is (fallback case)
+		if err != nil {
+			absPath, err = filepath.Abs(cleanLink)
+			if err == nil {
+				file, err = os.Open(absPath)
+			}
+		}
+		
+		// If both methods fail, return error
 		if err != nil {
 			return nil, fmt.Errorf("failed to open local file: %v", err)
 		}
