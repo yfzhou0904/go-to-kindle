@@ -52,16 +52,16 @@ func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (
 			},
 		}
 	} else {
-		// local file - handle terminal autoescape for whitespace
-		unescapedPath := strings.ReplaceAll(link, "\\ ", " ")
-		absPath, err := filepath.Abs(unescapedPath)
+		absPath, err := filepath.Abs(normalizeLocalPath(link))
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve local file path: %v", err)
 		}
+
 		file, err := os.Open(absPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open local file: %v", err)
 		}
+
 		resp = &http.Response{
 			Body: file,
 			Request: &http.Request{
@@ -72,19 +72,15 @@ func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (
 		}
 	}
 
-	// Save raw retrieved content for debug if needed
 	if util.Debug(ctx) {
-		// Read the response body to save it
 		rawContent, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body for debug: %v", err)
 		}
-
-		// Save raw retrieved content immediately
-		timestamp := time.Now().Format("20060102150405")
-		archiveDir := filepath.Join(util.BaseDir(), "archive")
-		rawDebugPath := filepath.Join(archiveDir, fmt.Sprintf("%s_debug_retrieved.html", timestamp))
-		err = os.WriteFile(rawDebugPath, rawContent, 0644)
+		err = os.WriteFile(
+			filepath.Join(filepath.Join(util.BaseDir(), "archive"),
+				fmt.Sprintf("%s_debug_retrieved.html", time.Now().Format("20060102150405"))),
+			rawContent, 0644)
 		if err != nil {
 			fmt.Printf("Warning: failed to save debug retrieved file: %v\n", err)
 		}
@@ -134,4 +130,35 @@ func postProcessContent(ctx context.Context, resp *http.Response, excludeImages 
 	}
 
 	return article, filename, lang.String(), wordCount, imageCount, archivePath, nil
+}
+
+// takes a file path string supplied by user dragging a file into terminal, or via copy-paste
+// returns a normalized absolute path that can be used to open the file
+func normalizeLocalPath(path string) string {
+	// Clean input - remove leading/trailing whitespace
+	clean := strings.TrimSpace(path)
+
+	// Remove surrounding quotes (drag-drop adds these)
+	if (strings.HasPrefix(clean, `"`) && strings.HasSuffix(clean, `"`)) ||
+		(strings.HasPrefix(clean, `'`) && strings.HasSuffix(clean, `'`)) {
+		clean = clean[1 : len(clean)-1]
+	}
+
+	// Unescape common terminal-escaped characters
+	replacements := map[string]string{
+		"\\ ": " ",
+		"\\(": "(",
+		"\\)": ")",
+		"\\[": "[",
+		"\\]": "]",
+		"\\&": "&",
+		"\\;": ";",
+		"\\'": "'",
+	}
+
+	for escaped, unescaped := range replacements {
+		clean = strings.ReplaceAll(clean, escaped, unescaped)
+	}
+
+	return clean
 }
