@@ -37,7 +37,7 @@ func (s *ScrapingBeeMethod) Retrieve(targetURL *url.URL) *Result {
 	}
 
 	// Build ScrapingBee API URL
-	scrapingBeeURL := fmt.Sprintf("https://app.scrapingbee.com/api/v1/?api_key=%s&url=%s&render_js=true",
+	scrapingBeeURL := fmt.Sprintf("https://app.scrapingbee.com/api/v1/?api_key=%s&url=%s&render_js=true&wait_browser=networkidle2",
 		s.apiKey, url.QueryEscape(targetURL.String()))
 
 	// Create request
