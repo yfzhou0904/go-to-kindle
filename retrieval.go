@@ -154,6 +154,7 @@ func normalizeLocalPath(path string) string {
 		"\\&": "&",
 		"\\;": ";",
 		"\\'": "'",
+		"\\?": "?",
 	}
 
 	for escaped, unescaped := range replacements {
