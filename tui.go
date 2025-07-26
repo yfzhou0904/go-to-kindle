@@ -264,7 +264,7 @@ func (m model) View() string {
 		proxyInfo := util.GetProxyInfoForDisplay()
 		proxyDisplay := ""
 		if proxyInfo != nil {
-			proxyDisplay = fmt.Sprintf("\n%s", subtleStyle.Render(fmt.Sprintf("🌐 Proxy detected: %s (from %s)", proxyInfo.URL, proxyInfo.Source)))
+			proxyDisplay = fmt.Sprintf("\n\n%s", subtleStyle.Render(fmt.Sprintf("🌐 Proxy detected: %s (from %s)", proxyInfo.URL, proxyInfo.Source)))
 		}
 
 		return fmt.Sprintf(

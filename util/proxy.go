@@ -35,7 +35,7 @@ func DetectProxy() *ProxyInfo {
 func checkEnvProxy() *ProxyInfo {
 	// Check common proxy environment variables
 	envVars := []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"}
-	
+
 	for _, envVar := range envVars {
 		if proxy := os.Getenv(envVar); proxy != "" {
 			// Ensure the proxy URL has a scheme
@@ -48,7 +48,7 @@ func checkEnvProxy() *ProxyInfo {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -71,7 +71,7 @@ func checkSystemProxy() *ProxyInfo {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -79,11 +79,11 @@ func checkSystemProxy() *ProxyInfo {
 func CreateHTTPTransportWithProxy() *http.Transport {
 	// Start with a clone of the default transport
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	
+
 	// Use ieproxy to handle all proxy detection automatically
 	// This will check environment variables first, then system settings
 	transport.Proxy = ieproxy.GetProxyFunc()
-	
+
 	return transport
 }
 
