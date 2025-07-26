@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
 // ScrapingBeeMethod implements ScrapingBee API requests
@@ -46,9 +48,10 @@ func (s *ScrapingBeeMethod) Retrieve(targetURL *url.URL) *Result {
 		return &Result{Error: NewFallbackError(s.Name(), "request creation failed", err)}
 	}
 
-	// Create HTTP client with longer timeout for ScrapingBee (JS rendering takes time)
+	// Create HTTP client with longer timeout for ScrapingBee (JS rendering takes time) and proxy support
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout:   30 * time.Second,
+		Transport: util.CreateHTTPTransportWithProxy(),
 	}
 
 	// Send request

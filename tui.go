@@ -260,14 +260,22 @@ func (m model) View() string {
 			scrapingBeeStyle = headerStyle
 		}
 
+		// Get proxy info for display
+		proxyInfo := util.GetProxyInfoForDisplay()
+		proxyDisplay := ""
+		if proxyInfo != nil {
+			proxyDisplay = fmt.Sprintf("\n\n%s", subtleStyle.Render(fmt.Sprintf("🌐 Proxy detected: %s (from %s)", proxyInfo.URL, proxyInfo.Source)))
+		}
+
 		return fmt.Sprintf(
-			"%s\n\n%s\n\n%s %s\n%s %s\n\n%s\n",
+			"%s\n\n%s\n\n%s %s\n%s %s%s\n\n%s\n",
 			headerStyle.Render("📚 Go to Kindle"),
 			m.urlInput.View(),
 			excludeImagesStyle.Render(excludeImagesCheckbox),
 			excludeImagesStyle.Render("Exclude Images (resized to 300px)"),
 			scrapingBeeStyle.Render(scrapingBeeCheckbox),
 			scrapingBeeStyle.Render("Force ScrapingBee (slower but more reliable)"),
+			proxyDisplay,
 			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
 		)
 
