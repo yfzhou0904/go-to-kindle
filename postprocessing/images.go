@@ -106,8 +106,9 @@ func resizeImageBytes(data []byte, maxDim int) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	// Resize maintaining aspect ratio
-	resizedImg := resize.Thumbnail(uint(maxDim), uint(maxDim), img, resize.Lanczos3)
+	// Resize maintaining aspect ratio using Mitchell filter for better chart/text readability
+	// Mitchell filter preserves sharp edges better than Lanczos3, which is crucial for charts
+	resizedImg := resize.Thumbnail(uint(maxDim), uint(maxDim), img, resize.MitchellNetravali)
 
 	// Determine output format and encode
 	var buf bytes.Buffer
@@ -115,7 +116,9 @@ func resizeImageBytes(data []byte, maxDim int) ([]byte, string, error) {
 
 	switch format {
 	case "jpeg":
-		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 100})
+		// Use 95% quality for better compression while maintaining readability
+		// 100% can actually introduce artifacts and larger file sizes
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 95})
 		outputFormat = "jpeg"
 	case "png":
 		err = png.Encode(&buf, resizedImg)
@@ -125,11 +128,11 @@ func resizeImageBytes(data []byte, maxDim int) ([]byte, string, error) {
 		outputFormat = "gif"
 	case "webp":
 		// Convert WebP to JPEG since we can't encode WebP
-		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 100})
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 95})
 		outputFormat = "jpeg"
 	default:
 		// Default to JPEG for unknown formats
-		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 100})
+		err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 95})
 		outputFormat = "jpeg"
 	}
 
