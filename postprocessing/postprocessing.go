@@ -23,11 +23,11 @@ func ProcessArticle(resp *http.Response, excludeImages bool) (*readability.Artic
 // ProcessArticleWithClient handles the complete post-processing pipeline for articles with custom HTTP client
 func ProcessArticleWithClient(resp *http.Response, excludeImages bool, client *http.Client) (*readability.Article, string, int, error) {
 	ctx := context.Background()
-	return ProcessArticleWithContext(ctx, resp, excludeImages)
+	return ProcessArticleWithContext(ctx, resp, excludeImages, client)
 }
 
 // handles the complete post-processing pipeline with context support
-func ProcessArticleWithContext(ctx context.Context, resp *http.Response, excludeImages bool) (*readability.Article, string, int, error) {
+func ProcessArticleWithContext(ctx context.Context, resp *http.Response, excludeImages bool, client *http.Client) (*readability.Article, string, int, error) {
 	// Parse webpage using readability
 	article, err := readability.FromReader(resp.Body, resp.Request.URL)
 	if err != nil {
@@ -57,7 +57,7 @@ func ProcessArticleWithContext(ctx context.Context, resp *http.Response, exclude
 	}
 
 	// Post-process the article content
-	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, nil)
+	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, client)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}
