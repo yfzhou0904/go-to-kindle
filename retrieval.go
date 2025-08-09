@@ -96,7 +96,7 @@ func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (
 func postProcessContent(ctx context.Context, resp *http.Response, excludeImages bool) (*readability.Article, string, string, int, int, string, error) {
 	defer resp.Body.Close()
 
-	article, filename, imageCount, err := postprocessing.ProcessArticleWithContext(ctx, resp, excludeImages)
+	article, filename, imageCount, err := postprocessing.ProcessArticleWithContext(ctx, resp, excludeImages, nil)
 	if err != nil {
 		return nil, "", "", 0, 0, "", fmt.Errorf("failed to process article: %v", err)
 	}
