@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 
+	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
 	"github.com/yfzhou0904/go-to-kindle/mail"
 	"github.com/yfzhou0904/go-to-kindle/util"
 
@@ -69,17 +69,13 @@ func main() {
 
 // Process and send article
 func processAndSend(article *readability.Article, filename string, archivePath string) error {
+	repo := repositories.NewLocalFileRepository()
+
 	// Check if we need to update the file with a new title
 	currentArchivePath := filepath.Join(util.BaseDir(), "archive", filename)
 	if currentArchivePath != archivePath {
 		// Title was changed, need to rewrite the file with new filename
-		_, err := createFile(currentArchivePath)
-		if err != nil {
-			return fmt.Errorf("failed to create new archive file: %v", err)
-		}
-
-		err = writeToFile(article, currentArchivePath)
-		if err != nil {
+		if err := repo.SaveArticle(article, currentArchivePath); err != nil {
 			return fmt.Errorf("failed to write to new archive file: %v", err)
 		}
 
@@ -91,64 +87,14 @@ func processAndSend(article *readability.Article, filename string, archivePath s
 		archivePath = currentArchivePath
 	} else {
 		// Title unchanged, but we might need to update content if title was edited
-		err := writeToFile(article, archivePath)
-		if err != nil {
+		if err := repo.SaveArticle(article, archivePath); err != nil {
 			return fmt.Errorf("failed to update archive file: %v", err)
 		}
 	}
 
-	err := mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), archivePath, Conf.Email.Port)
-	if err != nil {
+	if err := mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), archivePath, Conf.Email.Port); err != nil {
 		return fmt.Errorf("failed to send email: %v", err)
 	}
 
 	return nil
 }
-
-type HtmlData struct {
-	Title   string
-	Content string
-	Author  string
-}
-
-func writeToFile(article *readability.Article, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	t := template.Must(template.New("html").Parse(htmlTemplate))
-	err = t.Execute(file, HtmlData{
-		Title:   article.Title,
-		Author:  article.Byline,
-		Content: article.Content,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func createFile(p string) (*os.File, error) {
-	// Create directories if they do not exist
-	if err := os.MkdirAll(filepath.Dir(p), 0770); err != nil {
-		return nil, err
-	}
-
-	// Create the file
-	return os.Create(p)
-}
-
-const htmlTemplate = `<!DOCTYPE html>
-<html>
-<head>
-	<title>{{.Title}}</title>
-	<meta name="author" content="{{.Author}}">
-</head>
-<body>
-	{{.Content}}
-</body>
-</html>
-`

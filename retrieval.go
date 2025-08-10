@@ -14,6 +14,7 @@ import (
 
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/retrieval"
 	"github.com/yfzhou0904/go-to-kindle/util"
@@ -119,13 +120,8 @@ func postProcessContent(ctx context.Context, resp *http.Response, excludeImages 
 	}
 
 	archivePath := filepath.Join(util.BaseDir(), "archive", filename)
-	_, err = createFile(archivePath)
-	if err != nil {
-		return nil, "", "", 0, 0, "", fmt.Errorf("failed to create archive file: %v", err)
-	}
-
-	err = writeToFile(article, archivePath)
-	if err != nil {
+	repo := repositories.NewLocalFileRepository()
+	if err := repo.SaveArticle(article, archivePath); err != nil {
 		return nil, "", "", 0, 0, "", fmt.Errorf("failed to write to archive file: %v", err)
 	}
 
