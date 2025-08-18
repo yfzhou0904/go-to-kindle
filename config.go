@@ -11,8 +11,8 @@ import (
 )
 
 type Config struct {
-	Email       ConfigEmail       `toml:"email"`
-	ScrapingBee ConfigScrapingBee `toml:"scrapingbee"`
+	Email   ConfigEmail   `toml:"email"`
+	Browser ConfigBrowser `toml:"browser"`
 }
 type ConfigEmail struct {
 	SMTPServer string `toml:"smtp_server"`
@@ -21,8 +21,8 @@ type ConfigEmail struct {
 	Password   string
 	To         string
 }
-type ConfigScrapingBee struct {
-	APIKey string `toml:"api_key"`
+type ConfigBrowser struct {
+	ChromePath string `toml:"chrome_path"`
 }
 
 func loadConfig() error {

@@ -25,8 +25,8 @@ var Conf Config = Config{
 		Password:   "YOUR_EMAIL_PSWD",
 		To:         "YOU@kindle.com",
 	},
-	ScrapingBee: ConfigScrapingBee{
-		APIKey: "YOUR_SCRAPINGBEE_API_KEY",
+	Browser: ConfigBrowser{
+		ChromePath: "",
 	},
 }
 

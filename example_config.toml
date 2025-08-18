@@ -5,5 +5,5 @@ from = "username@126.com"
 password = "123"
 to = "username@kindle.com"
 
-[scrapingbee]
-api_key = "your-scrapingbee-api-key"
+[browser]
+chrome_path = "/path/to/chrome" 

@@ -28,21 +28,21 @@ const (
 
 // Main TUI model
 type model struct {
-	state            screenState
-	urlInput         textinput.Model
-	titleInput       textinput.Model
-	spinner          spinner.Model
-	article          *readability.Article
-	filename         string
-	archivePath      string
-	language         string
-	wordCount        int
-	imageCount       int
-	err              error
-	excludeImages    bool
-	forceScrapingBee bool
-	debug            bool
-	checkboxFocused  int // 0 = url input, 1 = include images, 2 = force scrapingbee
+	state           screenState
+	urlInput        textinput.Model
+	titleInput      textinput.Model
+	spinner         spinner.Model
+	article         *readability.Article
+	filename        string
+	archivePath     string
+	language        string
+	wordCount       int
+	imageCount      int
+	err             error
+	excludeImages   bool
+	useChromedp     bool
+	debug           bool
+	checkboxFocused int // 0 = url input, 1 = include images, 2 = use chromedp
 }
 
 // Messages for async operations
@@ -156,7 +156,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 1:
 					m.excludeImages = !m.excludeImages
 				case 2:
-					m.forceScrapingBee = !m.forceScrapingBee
+					m.useChromedp = !m.useChromedp
 				}
 			}
 		case "esc":
@@ -168,7 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
 					m.state = retrievalScreen
-					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.forceScrapingBee, m.debug))
+					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.useChromedp, m.debug))
 				}
 			case editScreen:
 				// Update title if changed
@@ -246,18 +246,18 @@ func (m model) View() string {
 			excludeImagesCheckbox = "☑"
 		}
 
-		scrapingBeeCheckbox := "☐"
-		if m.forceScrapingBee {
-			scrapingBeeCheckbox = "☑"
+		browserCheckbox := "☐"
+		if m.useChromedp {
+			browserCheckbox = "☑"
 		}
 
 		excludeImagesStyle := subtleStyle
-		scrapingBeeStyle := subtleStyle
+		browserStyle := subtleStyle
 		switch m.checkboxFocused {
 		case 1:
 			excludeImagesStyle = headerStyle
 		case 2:
-			scrapingBeeStyle = headerStyle
+			browserStyle = headerStyle
 		}
 
 		// Get proxy info for display
@@ -273,8 +273,8 @@ func (m model) View() string {
 			m.urlInput.View(),
 			excludeImagesStyle.Render(excludeImagesCheckbox),
 			excludeImagesStyle.Render("Exclude Images (resized to 300px)"),
-			scrapingBeeStyle.Render(scrapingBeeCheckbox),
-			scrapingBeeStyle.Render("Force ScrapingBee (slower but more reliable)"),
+			browserStyle.Render(browserCheckbox),
+			browserStyle.Render("Use Headless Browser (slower but handles JS)"),
 			proxyDisplay,
 			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
 		)
@@ -347,13 +347,13 @@ func (m model) View() string {
 }
 
 // Command to retrieve content
-func retrieveContentCmd(input string, forceScrapingBee bool, debug bool) tea.Cmd {
+func retrieveContentCmd(input string, useChromedp bool, debug bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		if debug {
 			ctx = util.WithDebug(ctx, debug)
 		}
-		resp, err := retrieveContent(ctx, input, forceScrapingBee)
+		resp, err := retrieveContent(ctx, input, useChromedp)
 		return retrievalCompleteMsg{resp: resp, err: err}
 	}
 }

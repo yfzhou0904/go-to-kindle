@@ -7,7 +7,7 @@
 - **Interactive Terminal UI**: Modern Bubbletea-based interface with guided workflow
 - **Multiple Sources**: Supports web URLs (http/https) and local HTML files
 - **Smart Processing**: Extracts readable content, processes images, detects language
-- **Robust Retrieval**: Multi-tier fetching with ScrapingBee fallback for blocked sites
+- **Robust Retrieval**: Optional headless browser mode for JS-heavy or blocked sites
 - **Image Support**: Optional image inclusion with automatic resizing (300px max)
 - **Editable Titles**: Review and customize article titles before sending
 - **Kindle Optimized**: Generates clean HTML files perfect for Kindle reading
@@ -20,8 +20,8 @@
 │   URL Input     │    │   🔍 Retrieval   │    │ ⚙️ Processing   │
 │                 │    │                  │    │                 │
 │ • Web URL       │───▶│ 1. Direct HTTP   │───▶│ • Readability   │
-│ • Local file    │    │ 2. ScrapingBee   │    │ • Image resize  │
-│ • Options       │    │    (fallback)    │    │ • Content clean │
+│ • Local file    │    │ 2. Headless      │    │ • Image resize  │
+│ • Options       │    │    Browser       │    │ • Content clean │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                                          │
 ┌─────────────────┐    ┌──────────────────┐              │
@@ -34,8 +34,8 @@
 ```
 
 The tool provides an intuitive 5-step workflow:
-1. **Input & Options**: Enter URL/file path, toggle image inclusion and ScrapingBee
-2. **Content Retrieval**: Multi-tier fetching (web URLs or local files) with progress indicator
+1. **Input & Options**: Enter URL/file path, toggle image inclusion and headless browser
+2. **Content Retrieval**: Fetch content using direct HTTP or the headless browser with progress indicator
 3. **Content Processing**: Readability extraction, image processing, and content cleaning
 4. **Review & Edit**: Check metadata (language, word count, images) and customize title
 5. **Delivery**: Email to Kindle with local archive copy
@@ -78,6 +78,13 @@ Password = "your-app-password"  # Email password or app password
 To = "your-kindle@kindle.com"   # Your Kindle email address
 ```
 
+Optionally configure a custom Chrome/Chromium binary:
+
+```toml
+[browser]
+chrome_path = "/usr/bin/chromium"
+```
+
 ### Gmail Setup
 1. Enable 2FA on your Google account
 2. Generate an App Password for go-to-kindle
@@ -104,10 +111,10 @@ go-to-kindle
 ### Input Options
 - **URL or File Path**: Web articles or local HTML files
 - **Include Images**: Toggle to include resized images (300px max, base64 embedded)
-- **Force ScrapingBee**: Use premium service for difficult sites (slower but more reliable)
+- **Use Headless Browser**: Handle JS-heavy or protected sites (slower but more reliable)
 
 ### Processing Features
-- **Multi-tier Retrieval**: Direct HTTP first, ScrapingBee fallback for blocked requests
+- **Retrieval Modes**: Direct HTTP or headless browser for JS-heavy or blocked pages
 - **Content Extraction**: Uses go-readability for clean article text
 - **Image Processing**: Downloads, resizes, and embeds images as base64 data URLs
 - **Language Detection**: Supports English and Chinese with appropriate word counting
@@ -123,16 +130,15 @@ go-to-kindle
 - **Enter**: Proceed to next step
 - **Ctrl+C**: Quit at any time
 - **Tab/↑↓**: Navigate between input fields and options
-- **Space**: Toggle checkboxes (Include Images, Force ScrapingBee)
+- **Space**: Toggle checkboxes (Include Images, Use Headless Browser)
 
 ## Troubleshooting
 
 **Config file issues**: Delete `~/.go-to-kindle/config.toml` to recreate it
 **SMTP errors**: Verify email credentials and server settings
-**Blocked websites**: Try enabling "Force ScrapingBee" option for difficult sites
+**Blocked websites**: Try enabling "Use Headless Browser" option for difficult sites
 **Image issues**: Some email providers may reject large embedded images
 **Short articles**: Articles under 100 words are rejected (likely parsing failures)
-**ScrapingBee errors**: Check API key configuration if using premium features
 
 ## File Storage
 

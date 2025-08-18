@@ -21,7 +21,7 @@ import (
 )
 
 // retrieveContent handles both web URLs and local files, returning raw HTTP response
-func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (*http.Response, error) {
+func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http.Response, error) {
 	link := input
 	var resp *http.Response
 
@@ -34,8 +34,8 @@ func retrieveContent(ctx context.Context, input string, forceScrapingBee bool) (
 
 		// Create retrieval chain
 		retrievalConfig := retrieval.Config{
-			ScrapingBeeAPIKey: Conf.ScrapingBee.APIKey,
-			ForceScrapingBee:  forceScrapingBee,
+			ChromeExecPath: Conf.Browser.ChromePath,
+			UseChromedp:    useChromedp,
 		}
 		chain := retrieval.NewChain(retrievalConfig)
 

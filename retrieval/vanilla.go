@@ -2,6 +2,7 @@ package retrieval
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -29,12 +30,11 @@ func (v *VanillaMethod) CanHandle(url *url.URL) bool {
 	return strings.HasPrefix(url.String(), "http://") || strings.HasPrefix(url.String(), "https://")
 }
 
-
 // Retrieve fetches content using vanilla HTTP GET with timeout and blocking detection
 func (v *VanillaMethod) Retrieve(url *url.URL) *Result {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		return &Result{Error: NewFallbackError(v.Name(), "request creation failed", err)}
+		return &Result{Error: err}
 	}
 
 	// Set the User-Agent header to mimic a normal browser
@@ -49,34 +49,33 @@ func (v *VanillaMethod) Retrieve(url *url.URL) *Result {
 	// Send the request using the client
 	resp, err := client.Do(req)
 	if err != nil {
-		// Check if it's a timeout error
 		if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
-			return &Result{Error: NewFallbackError(v.Name(), "request timeout (>5s)", err)}
+			return &Result{Error: fmt.Errorf("request timeout (>5s): %w", err)}
 		}
-		return &Result{Error: NewFallbackError(v.Name(), "network error", err)}
+		return &Result{Error: err}
 	}
 
 	// Check for HTTP error status codes that might indicate blocking
 	if resp.StatusCode == 403 || resp.StatusCode == 429 {
 		resp.Body.Close()
-		return &Result{Error: NewFallbackError(v.Name(), "blocked by server", nil)}
+		return &Result{Error: fmt.Errorf("blocked by server: %d", resp.StatusCode)}
 	}
 
 	if resp.StatusCode != 200 {
 		resp.Body.Close()
-		return &Result{Error: NewFallbackError(v.Name(), "HTTP error", nil)}
+		return &Result{Error: fmt.Errorf("HTTP status %d", resp.StatusCode)}
 	}
 
 	// Read content to check for blocking patterns
 	contentBytes, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return &Result{Error: NewFallbackError(v.Name(), "failed to read response", err)}
+		return &Result{Error: err}
 	}
 
 	content := string(contentBytes)
 	if isContentBlocked(content) {
-		return &Result{Error: NewFallbackError(v.Name(), "content indicates blocking (Cloudflare/JS required)", nil)}
+		return &Result{Error: fmt.Errorf("content indicates blocking")}
 	}
 
 	// Return successful result with content as ReadCloser
