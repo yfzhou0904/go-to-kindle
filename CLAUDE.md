@@ -6,7 +6,7 @@ Interactive CLI tool that fetches web articles or local HTML files, processes th
 
 ### Core Components
 - **TUI** (`tui.go`): Bubbletea-based interface with 5 screen states
-- **Retrieval** (`retrieval.go` + `retrieval/`): Multi-tier fetching system with fallback chain
+- **Retrieval** (`retrieval.go` + `retrieval/`): Direct HTTP or headless browser fetching
 - **Post-Processing** (`postprocessing/`): Content extraction and image processing
 - **Email** (`mail/mail.go`): SMTP delivery with HTML attachments
 - **Config** (`config.go`): TOML-based settings management
@@ -38,8 +38,8 @@ type model struct {
     state            screenState
     article          *readability.Article
     filename         string
-    excludeImages    bool
-    forceScrapingBee bool
+    excludeImages   bool
+    useChromedp    bool
     // ... UI components (inputs, spinner, etc.)
 }
 
@@ -51,14 +51,14 @@ type Result struct {
 }
 ```
 
-### Retrieval Chain
+### Retrieval Modes
 ```go
 // retrieval/interface.go:44-62
-// Creates fallback chain: Direct HTTP → ScrapingBee → Vanilla fallback
+// Selects either direct HTTP or Chromedp based on config
 func NewChain(config Config) *Chain
 ```
 
-The retrieval system (`retrieval/interface.go:83-136`) tries methods in sequence until success or all fail.
+The retrieval system picks a single method (HTTP or headless browser) and runs it.
 
 ### Retrieval Architecture
 
@@ -69,8 +69,8 @@ Input URL/File
 ┌─────────────┐
 │ Retrieval   │  ┌──> Direct HTTP ───┐
 │ Screen      │──┤                   ├──> HTTP Response
-│ retrieval/  │  └──> ScrapingBee ───┘      |
-└─────────────┘         (fallback)          v
+│ retrieval/  │  └──> Chromedp ─────┘      |
+└─────────────┘                           v
                                     ┌───────────────┐
                                     │ Post-Process  │
                                     │ Screen        │
