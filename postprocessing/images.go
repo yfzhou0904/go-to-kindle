@@ -12,10 +12,10 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/nfnt/resize"
+	"github.com/yfzhou0904/go-to-kindle/util"
 	_ "golang.org/x/image/webp" // Register WebP format
 )
 
@@ -38,7 +38,7 @@ func downloadImage(imageURL string, baseURL *url.URL, client *http.Client) ([]by
 	// Use provided client or create default one with timeout
 	if client == nil {
 		client = &http.Client{
-			Timeout: 5 * time.Second,
+			Transport: util.CreateHTTPTransportWithProxy(),
 		}
 	}
 

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
@@ -40,9 +39,8 @@ func (v *VanillaMethod) Retrieve(url *url.URL) *Result {
 	// Set the User-Agent header to mimic a normal browser
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
 
-	// Create HTTP client with 5-second timeout and proxy support
+	// Create HTTP client with 30-second timeout and proxy support
 	client := http.Client{
-		Timeout:   5 * time.Second,
 		Transport: util.CreateHTTPTransportWithProxy(),
 	}
 
