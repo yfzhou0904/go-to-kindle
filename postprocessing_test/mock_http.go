@@ -35,6 +35,8 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Map common test image paths to local files
 	var localPath string
 	switch {
+	case strings.Contains(requestPath, "sample@2x.png"):
+		localPath = filepath.Join(m.testDataDir, "test_images", "sample@2x.png")
 	case strings.Contains(requestPath, "sample.png"):
 		localPath = filepath.Join(m.testDataDir, "test_images", "sample.png")
 	case strings.Contains(requestPath, "sample.jpg"):

@@ -36,17 +36,22 @@
             <!-- Case 5: Picture element with source tags -->
             <picture>
                 <source srcset="/test_images/sample.webp" type="image/webp" />
-                <source srcset="/test_images/sample.png" type="image/png" />
-                <img src="/test_images/sample.png" alt="Picture element test" />
+                <source srcset="/test_images/sample@2x.png 2w, /test_images/sample.png 1w" type="image/png" />
+                <img src="/test_images/sample.png" alt="Picture element test"
+                     srcset="/test_images/sample.png 600w, /test_images/sample@2x.png 1200w" />
             </picture>
 
-            <!-- Case 6: Image without src (should be removed) -->
+            <!-- Case 6: Lone source outside picture -->
+            <p>Lone source outside picture:</p>
+            <source srcset="/test_images/sample.png" />
+
+            <!-- Case 7: Image without src (should be removed) -->
             <img alt="No src image" width="100" height="100" />
 
-            <!-- Case 7: Image with empty src (should be removed) -->
+            <!-- Case 8: Image with empty src (should be removed) -->
             <img src="" alt="Empty src image" />
 
-            <!-- Case 8: Image with WordPress-specific attributes (attrs should be cleaned) -->
+            <!-- Case 9: Image with WordPress-specific attributes (attrs should be cleaned) -->
             <img src="/test_images/sample.png"
                  alt="WordPress style image"
                  data-orig-size="800,600"

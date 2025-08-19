@@ -3,7 +3,7 @@
   "inputFile": "html_samples/mock_article.html",
   "baseURL": "https://example.com/article",
   "excludeImages": false,
-  "expectedImageCount": 8,
+  "expectedImageCount": 7,
   "mustNotContain": [
     "srcset",
     "loading",
@@ -19,6 +19,7 @@
     "data:image/png;base64,",
     "Image Test Cases",
     "Base64 embedded image:",
-    "WordPress style image"
+    "WordPress style image",
+    "Lone source outside picture:"
   ]
 }

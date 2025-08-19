@@ -76,24 +76,18 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 
 	// Process images based on excludeImages flag
 	if !excludeImages {
-		// Use unified functions that handle both web URLs and local files
-		// For web URLs, baseURL will be valid; for local files, baseURL will be nil
+		imageCount += processPictureElements(contentDoc, baseURL, client)
 		imageCount += processImageElements(contentDoc, baseURL, client)
-		// Also process source elements in picture tags
-		imageCount += processSourceElements(contentDoc, baseURL, client)
-		// Remove figures and pictures that no longer contain images (empty after processing)
+		imageCount += processLoneSourceElements(contentDoc, baseURL, client)
+
+		contentDoc.Find("source").Remove()
+		contentDoc.Find("picture").Remove()
 		contentDoc.Find("figure").Each(func(i int, s *goquery.Selection) {
 			if s.Find("img").Length() == 0 {
 				s.Remove()
 			}
 		})
-		contentDoc.Find("picture").Each(func(i int, s *goquery.Selection) {
-			if s.Find("img,source").Length() == 0 {
-				s.Remove()
-			}
-		})
 	} else {
-		// Remove all images, figures, pictures, and sources
 		contentDoc.Find("img,figure,picture,source").Remove()
 	}
 

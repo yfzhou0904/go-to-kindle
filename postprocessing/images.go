@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"html"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -203,13 +204,122 @@ func processURLImageData(src string, baseURL *url.URL, client *http.Client) (str
 	return processImageData(imageData)
 }
 
+// processPictureElements collapses each <picture> into a single <img>
+// selecting the best candidate from srcset or src attributes.
+func processPictureElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
+	processed := 0
+
+	// helper to choose largest width from a srcset
+	pickBestFromSrcset := func(srcset string) string {
+		best := ""
+		bestW := -1
+		for _, part := range strings.Split(srcset, ",") {
+			part = strings.TrimSpace(part)
+			fields := strings.Fields(part)
+			if len(fields) == 0 {
+				continue
+			}
+			u := fields[0]
+			w := 0
+			if len(fields) > 1 && strings.HasSuffix(fields[1], "w") {
+				fmt.Sscanf(fields[1], "%dw", &w)
+			}
+			if w > bestW {
+				bestW = w
+				best = u
+			}
+			if best == "" {
+				best = u
+			}
+		}
+		return best
+	}
+
+	doc.Find("picture").Each(func(i int, p *goquery.Selection) {
+		img := p.Find("img").First()
+		var chosenURL, alt string
+
+		if img.Length() > 0 {
+			if v, ok := img.Attr("alt"); ok {
+				alt = v
+			}
+			if ss, ok := img.Attr("srcset"); ok && strings.TrimSpace(ss) != "" {
+				chosenURL = pickBestFromSrcset(ss)
+			}
+			if chosenURL == "" {
+				if s, ok := img.Attr("src"); ok {
+					chosenURL = s
+				}
+			}
+		}
+
+		if chosenURL == "" {
+			p.Find("source").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+				if ss, ok := s.Attr("srcset"); ok && ss != "" {
+					u := pickBestFromSrcset(ss)
+					if u != "" {
+						if t, ok := s.Attr("type"); ok && strings.Contains(t, "webp") {
+							if chosenURL == "" {
+								chosenURL = u
+							}
+							return true
+						}
+						chosenURL = u
+						return false
+					}
+				}
+				if src, ok := s.Attr("src"); ok && src != "" {
+					chosenURL = src
+					return false
+				}
+				return true
+			})
+		}
+
+		if chosenURL == "" {
+			p.Remove()
+			return
+		}
+
+		var dataURL string
+		var err error
+		if strings.HasPrefix(chosenURL, "data:image/") {
+			dataURL, err = processBase64ImageData(chosenURL)
+		} else if baseURL != nil {
+			dataURL, err = processURLImageData(chosenURL, baseURL, client)
+		} else {
+			p.Remove()
+			return
+		}
+		if err != nil {
+			p.Remove()
+			return
+		}
+
+		repl := `<img src="` + dataURL + `"`
+		if alt != "" {
+			repl += ` alt="` + html.EscapeString(alt) + `"`
+		}
+		repl += ` data-processed="1" />`
+		p.ReplaceWithHtml(repl)
+		processed++
+	})
+
+	return processed
+}
+
 // processImageElements processes all img elements in the document (unified for web and local)
 func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
 	processedCount := 0
 	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+		if v, ok := s.Attr("data-processed"); ok && v == "1" {
+			removeImageAttributes(s)
+			s.RemoveAttr("data-processed")
+			return
+		}
+
 		src, exists := s.Attr("src")
 		if !exists || src == "" {
-			// Remove img tags without src
 			s.Remove()
 			return
 		}
@@ -218,25 +328,19 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.
 		var err error
 
 		if strings.HasPrefix(src, "data:image/") {
-			// Handle base64 images (works for both web and local)
 			dataURL, err = processBase64ImageData(src)
 		} else if baseURL != nil {
-			// Handle URL images (only for web pages with valid baseURL)
 			dataURL, err = processURLImageData(src, baseURL, client)
 		} else {
-			// For local files, remove non-base64 images
 			s.Remove()
 			return
 		}
 
 		if err == nil {
-			// Update src attribute with processed image
 			s.SetAttr("src", dataURL)
-			// Remove size-related attributes
 			removeImageAttributes(s)
 			processedCount++
 		} else {
-			// Remove images that couldn't be processed
 			s.Remove()
 		}
 	})
@@ -244,57 +348,52 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.
 	return processedCount
 }
 
-// processSourceElements processes source elements in picture tags (unified for web and local)
-func processSourceElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
-	processedCount := 0
+// processLoneSourceElements processes <source> tags that are not inside <picture>.
+func processLoneSourceElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
+	processed := 0
 	doc.Find("source").Each(func(i int, s *goquery.Selection) {
+		if s.ParentsFiltered("picture").Length() > 0 {
+			return
+		}
+
 		srcset, exists := s.Attr("srcset")
-		if !exists || srcset == "" {
-			// Try src attribute as fallback
-			src, srcExists := s.Attr("src")
-			if !srcExists || src == "" {
+		if !exists || strings.TrimSpace(srcset) == "" {
+			if src, ok := s.Attr("src"); ok && strings.TrimSpace(src) != "" {
+				srcset = src
+			} else {
 				s.Remove()
 				return
 			}
-			srcset = src
 		}
 
-		// Process the first URL from srcset (usually the main one)
 		urls := strings.Split(srcset, ",")
 		if len(urls) == 0 {
 			s.Remove()
 			return
 		}
 
-		// Extract the URL part (before any size descriptor)
 		firstURL := strings.TrimSpace(strings.Split(urls[0], " ")[0])
 
 		var dataURL string
 		var err error
-
 		if strings.HasPrefix(firstURL, "data:image/") {
-			// Handle base64 images (works for both web and local)
 			dataURL, err = processBase64ImageData(firstURL)
 		} else if baseURL != nil {
-			// Handle URL images (only for web pages with valid baseURL)
 			dataURL, err = processURLImageData(firstURL, baseURL, client)
 		} else {
-			// For local files, remove non-base64 sources
 			s.Remove()
 			return
 		}
 
 		if err == nil {
-			// Convert source to img element with processed image
 			s.ReplaceWithHtml(fmt.Sprintf(`<img src="%s" />`, dataURL))
-			processedCount++
+			processed++
 		} else {
-			// Remove sources that couldn't be processed
 			s.Remove()
 		}
 	})
 
-	return processedCount
+	return processed
 }
 
 // removeImageAttributes removes size and WordPress-specific attributes from images
