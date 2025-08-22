@@ -272,9 +272,9 @@ func (m model) View() string {
 			headerStyle.Render("📚 Go to Kindle"),
 			m.urlInput.View(),
 			excludeImagesStyle.Render(excludeImagesCheckbox),
-			excludeImagesStyle.Render("Exclude Images (resized to 300px)"),
+			excludeImagesStyle.Render("Exclude images"),
 			browserStyle.Render(browserCheckbox),
-			browserStyle.Render("Use Headless Browser (slower but handles JS)"),
+			browserStyle.Render("Use browser"),
 			proxyDisplay,
 			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
 		)
