@@ -3,6 +3,7 @@ package postprocessing
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html"
 	"image"
@@ -204,6 +205,22 @@ func processURLImageData(src string, baseURL *url.URL, client *http.Client) (str
 	return processImageData(imageData)
 }
 
+// extractURLFromDataAttrs parses Substack-style data-attrs to find the original image URL
+func extractURLFromDataAttrs(dataAttr string) string {
+	dataAttr = html.UnescapeString(dataAttr)
+	var attrs struct {
+		Src            string `json:"src"`
+		SrcNoWatermark string `json:"srcNoWatermark"`
+	}
+	if err := json.Unmarshal([]byte(dataAttr), &attrs); err != nil {
+		return ""
+	}
+	if attrs.SrcNoWatermark != "" {
+		return attrs.SrcNoWatermark
+	}
+	return attrs.Src
+}
+
 // processPictureElements collapses each <picture> into a single <img>
 // selecting the best candidate from srcset or src attributes.
 func processPictureElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
@@ -243,8 +260,15 @@ func processPictureElements(doc *goquery.Document, baseURL *url.URL, client *htt
 			if v, ok := img.Attr("alt"); ok {
 				alt = v
 			}
-			if ss, ok := img.Attr("srcset"); ok && strings.TrimSpace(ss) != "" {
-				chosenURL = pickBestFromSrcset(ss)
+			if da, ok := img.Attr("data-attrs"); ok {
+				if u := extractURLFromDataAttrs(da); u != "" {
+					chosenURL = u
+				}
+			}
+			if chosenURL == "" {
+				if ss, ok := img.Attr("srcset"); ok && strings.TrimSpace(ss) != "" {
+					chosenURL = pickBestFromSrcset(ss)
+				}
 			}
 			if chosenURL == "" {
 				if s, ok := img.Attr("src"); ok {
@@ -319,6 +343,12 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.
 		}
 
 		src, exists := s.Attr("src")
+		if da, ok := s.Attr("data-attrs"); ok {
+			if u := extractURLFromDataAttrs(da); u != "" {
+				src = u
+				exists = true
+			}
+		}
 		if !exists || src == "" {
 			s.Remove()
 			return
@@ -403,6 +433,7 @@ func removeImageAttributes(s *goquery.Selection) {
 	s.RemoveAttr("loading")
 	s.RemoveAttr("width")
 	s.RemoveAttr("height")
+	s.RemoveAttr("data-attrs")
 
 	// Remove WordPress-specific data attributes
 	s.RemoveAttr("data-orig-size")

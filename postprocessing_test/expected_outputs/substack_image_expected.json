@@ -1,0 +1,16 @@
+{
+  "testName": "substack_image",
+  "inputFile": "html_samples/substack_image.html",
+  "baseURL": "https://example.com/substack",
+  "excludeImages": false,
+  "expectedImageCount": 1,
+  "mustNotContain": [
+    "srcset",
+    "loading",
+    "data-attrs"
+  ],
+  "mustContain": [
+    "Intro text before image.",
+    "data:image/png;base64,"
+  ]
+}
