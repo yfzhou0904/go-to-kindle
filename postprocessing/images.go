@@ -403,6 +403,8 @@ func removeImageAttributes(s *goquery.Selection) {
 	s.RemoveAttr("loading")
 	s.RemoveAttr("width")
 	s.RemoveAttr("height")
+	s.RemoveAttr("style")
+	s.RemoveAttr("class")
 
 	// Remove WordPress-specific data attributes
 	s.RemoveAttr("data-orig-size")

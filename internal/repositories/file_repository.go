@@ -29,6 +29,9 @@ const htmlTemplate = `<!DOCTYPE html>
 <head>
         <title>{{.Title}}</title>
         <meta name="author" content="{{.Author}}">
+       <style>
+               img { display: block; margin-left: auto; margin-right: auto; }
+       </style>
 </head>
 <body>
         {{.Content}}
