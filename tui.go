@@ -328,9 +328,10 @@ func (m model) View() string {
 	case completionScreen:
 		if m.err != nil {
 			return fmt.Sprintf(
-				"%s\n\n%s\n\n%s\n",
+				"%s\n\n%s\n\n%s\n\n%s\n",
 				errorStyle.Render("❌ Error"),
 				m.err.Error(),
+				subtleStyle.Render(fmt.Sprintf("Original URL: %s", m.urlInput.Value())),
 				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		} else {
