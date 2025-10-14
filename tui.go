@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -304,22 +306,26 @@ func (m model) View() string {
 		)
 
 	case editScreen:
-		// Make file path clickable using OSC 8 hyperlink escape sequence
-		clickableFilePath := fmt.Sprintf("\033]8;;file://%s\033\\%s\033]8;;\033\\", m.archivePath, m.archivePath)
+		fileURL := &url.URL{Scheme: "file", Path: m.archivePath}
+		clickableArchiveLink := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", fileURL.String(), "Open archived HTML")
 
-		var metadata string
-		if !m.excludeImages && m.imageCount > 0 {
-			metadata = fmt.Sprintf("Language: %s • Words: %d • Images: %d • File: %s",
-				m.language, m.wordCount, m.imageCount, clickableFilePath)
-		} else {
-			metadata = fmt.Sprintf("Language: %s • Words: %d • File: %s",
-				m.language, m.wordCount, clickableFilePath)
+		metadataParts := []string{
+			fmt.Sprintf("Language: %s", m.language),
+			fmt.Sprintf("Words: %d", m.wordCount),
 		}
+		if !m.excludeImages && m.imageCount > 0 {
+			metadataParts = append(metadataParts, fmt.Sprintf("Images: %d", m.imageCount))
+		}
+
+		archivePathDisplay := formatArchivePathForDisplay(m.archivePath)
+
 		return fmt.Sprintf(
-			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
+			"%s\n\n%s\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
 			headerStyle.Render("✏️  Edit Article Title"),
 			subtleStyle.Render(fmt.Sprintf("Original: %s", m.article.Title)),
-			subtleStyle.Render(metadata),
+			subtleStyle.Render(strings.Join(metadataParts, " • ")),
+			subtleStyle.Render(clickableArchiveLink),
+			subtleStyle.Render(fmt.Sprintf("Archive path: %s", archivePathDisplay)),
 			m.titleInput.View(),
 			subtleStyle.Render("Press Enter to send to Kindle • Edit title or keep as-is"),
 			subtleStyle.Render("Ctrl+C to quit"),
@@ -345,6 +351,12 @@ func (m model) View() string {
 	}
 
 	return ""
+}
+
+func formatArchivePathForDisplay(path string) string {
+	path = strings.ReplaceAll(path, "/", "/\u200B")
+	path = strings.ReplaceAll(path, "\\", "\\\u200B")
+	return path
 }
 
 // Command to retrieve content
