@@ -113,8 +113,9 @@ func runSingleTest(t *testing.T, configPath, testDataDir string) {
 	// Create mock HTTP client for image downloads
 	mockClient := postprocessing_test.CreateMockHTTPClient(testDataDir)
 
-	// Process the article with mock client
-	article, filename, imageCount, err := ProcessArticleWithClient(resp, config.ExcludeImages, mockClient)
+	// Process the article with mock resolver
+	resolver := NewNetworkImageResolver(mockClient)
+	article, filename, imageCount, err := ProcessArticleWithResolver(resp, config.ExcludeImages, resolver)
 	if err != nil {
 		t.Fatalf("ProcessArticle failed: %v", err)
 	}

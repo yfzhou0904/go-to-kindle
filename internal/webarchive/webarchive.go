@@ -165,13 +165,14 @@ func InlineImages(html []byte, baseURL *url.URL, resources map[string]Resource) 
 	return []byte(rendered), nil
 }
 
-// InlineImagesInHTML rewrites existing HTML content (e.g. readability output) to inline images from resources.
-func InlineImagesInHTML(html string, baseURL *url.URL, resources map[string]Resource) (string, error) {
-	inlined, err := InlineImages([]byte(html), baseURL, resources)
-	if err != nil {
-		return "", err
+// ResolveImageDataURL resolves a source URL to a data URL from resources.
+func ResolveImageDataURL(raw string, baseURL *url.URL, resources map[string]Resource) (string, bool) {
+	resolved, ok := resolveResource(raw, baseURL, resources)
+	if !ok {
+		return "", false
 	}
-	return string(inlined), nil
+	dataURL, ok := resourceToDataURL(resolved)
+	return dataURL, ok
 }
 
 func inlineSrcset(srcset string, baseURL *url.URL, resources map[string]Resource) (string, bool) {

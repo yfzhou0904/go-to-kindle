@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -18,24 +17,22 @@ import (
 )
 
 func TestWebarchiveIntegration(t *testing.T) {
-	resp, err := retrieveContent(context.Background(), "testdata/The Stick in the Stream – Rands in Repose.webarchive", false)
+	input, err := retrieveContent(context.Background(), "testdata/The Stick in the Stream – Rands in Repose.webarchive", false)
 	if err != nil {
 		t.Fatalf("retrieveContent error: %v", err)
 	}
-	defer resp.Body.Close()
-	if resp.Request == nil {
-		t.Fatalf("expected request on response")
-	}
-	if _, _, ok := webarchive.GetArchive(resp.Request.Context()); !ok {
-		t.Fatalf("expected webarchive context on response request")
-	}
+	defer input.Body.Close()
 
-	blockedClient := &http.Client{
-		Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-			return nil, errors.New("network disabled by test")
-		}),
+	if _, ok := input.Resolver.(*postprocessing.WebarchiveImageResolver); !ok {
+		t.Fatalf("expected webarchive image resolver")
 	}
-	article, _, _, err := postprocessing.ProcessArticleWithContext(context.Background(), resp, false, blockedClient)
+	resp := &http.Response{
+		Body: input.Body,
+		Request: &http.Request{
+			URL: input.BaseURL,
+		},
+	}
+	article, _, _, err := postprocessing.ProcessArticleWithContext(context.Background(), resp, false, input.Resolver)
 	if err != nil {
 		t.Fatalf("ProcessArticleWithContext error: %v", err)
 	}
@@ -136,18 +133,4 @@ func TestWebarchiveReadabilityKeepsImages(t *testing.T) {
 	if strings.Contains(article.Content, "data:image/") {
 		t.Fatalf("expected readability to drop data URLs before reinlining")
 	}
-
-	reinlined, err := webarchive.InlineImagesInHTML(article.Content, baseURL, resources)
-	if err != nil {
-		t.Fatalf("InlineImagesInHTML error: %v", err)
-	}
-	if !strings.Contains(reinlined, "data:image/") {
-		t.Fatalf("expected data URLs after reinlining readability output")
-	}
-}
-
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
 }

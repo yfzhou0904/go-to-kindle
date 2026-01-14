@@ -22,12 +22,10 @@ import (
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
-// retrieveContent handles both web URLs and local files, returning raw HTTP response
-func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http.Response, error) {
+// retrieveContent handles both web URLs and local files, returning a normalized input result.
+func retrieveContent(ctx context.Context, input string, useChromedp bool) (*InputResult, error) {
 	link := input
-	var resp *http.Response
-	var archiveBaseURL *url.URL
-	var archiveResources map[string]webarchive.Resource
+	var result InputResult
 
 	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
 		// web url - use retrieval chain
@@ -44,17 +42,15 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http
 		chain := retrieval.NewChain(retrievalConfig)
 
 		// Attempt retrieval
-		result := chain.Retrieve(validURL)
-		if result.Error != nil {
-			return nil, fmt.Errorf("failed to retrieve webpage: %v", result.Error)
+		retrievalResult := chain.Retrieve(validURL)
+		if retrievalResult.Error != nil {
+			return nil, fmt.Errorf("failed to retrieve webpage: %v", retrievalResult.Error)
 		}
 
-		// Create http.Response-like structure for compatibility
-		resp = &http.Response{
-			Body: result.Content,
-			Request: &http.Request{
-				URL: result.URL,
-			},
+		result = InputResult{
+			Body:     retrievalResult.Content,
+			BaseURL:  retrievalResult.URL,
+			Resolver: postprocessing.NewNetworkImageResolver(nil),
 		}
 	} else {
 		absPath, err := filepath.Abs(normalizeLocalPath(link))
@@ -71,39 +67,31 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http
 			if err != nil {
 				return nil, err
 			}
-			inlined, err := webarchive.InlineImages(htmlContent, baseURL, resources)
-			if err != nil {
-				return nil, err
-			}
 			if baseURL == nil {
 				baseURL = &url.URL{Path: link}
 			}
-			archiveBaseURL = baseURL
-			archiveResources = resources
-			req := &http.Request{URL: baseURL}
-			resp = &http.Response{
-				Body:    io.NopCloser(bytes.NewReader(inlined)),
-				Request: req,
+			result = InputResult{
+				Body:     io.NopCloser(bytes.NewReader(htmlContent)),
+				BaseURL:  baseURL,
+				Resolver: postprocessing.NewWebarchiveImageResolver(resources),
 			}
 		} else {
 			file, err := os.Open(absPath)
 			if err != nil {
 				return nil, fmt.Errorf("failed to open local file: %v", err)
 			}
-
-			resp = &http.Response{
+			result = InputResult{
 				Body: file,
-				Request: &http.Request{
-					URL: &url.URL{
-						Path: link,
-					},
+				BaseURL: &url.URL{
+					Path: link,
 				},
+				Resolver: postprocessing.NewNetworkImageResolver(nil),
 			}
 		}
 	}
 
 	if util.Debug(ctx) {
-		rawContent, err := io.ReadAll(resp.Body)
+		rawContent, err := io.ReadAll(result.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body for debug: %v", err)
 		}
@@ -116,26 +104,24 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http
 		}
 
 		// Recreate the response body for further processing
-		resp.Body = io.NopCloser(strings.NewReader(string(rawContent)))
+		result.Body = io.NopCloser(strings.NewReader(string(rawContent)))
 	}
 
-	if archiveBaseURL != nil && archiveResources != nil {
-		req := resp.Request
-		if req == nil {
-			req = &http.Request{}
-		}
-		req = req.WithContext(webarchive.WithArchive(ctx, archiveBaseURL, archiveResources))
-		resp.Request = req
-	}
-
-	return resp, nil
+	return &result, nil
 }
 
 // processes the retrieved content into a final article
-func postProcessContent(ctx context.Context, resp *http.Response, excludeImages bool) (*readability.Article, string, string, int, int, string, error) {
-	defer resp.Body.Close()
+func postProcessContent(ctx context.Context, input *InputResult, excludeImages bool) (*readability.Article, string, string, int, int, string, error) {
+	defer input.Body.Close()
 
-	article, filename, imageCount, err := postprocessing.ProcessArticleWithContext(ctx, resp, excludeImages, nil)
+	resp := &http.Response{
+		Body: input.Body,
+		Request: &http.Request{
+			URL: input.BaseURL,
+		},
+	}
+
+	article, filename, imageCount, err := postprocessing.ProcessArticleWithContext(ctx, resp, excludeImages, input.Resolver)
 	if err != nil {
 		return nil, "", "", 0, 0, "", fmt.Errorf("failed to process article: %v", err)
 	}

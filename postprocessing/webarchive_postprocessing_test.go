@@ -1,7 +1,6 @@
 package postprocessing
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -39,10 +38,11 @@ func TestProcessContentWithWebarchiveImages(t *testing.T) {
 		t.Fatalf("readability error: %v", err)
 	}
 
-	article.Content, err = webarchive.InlineImagesInHTML(article.Content, baseURL, resources)
+	inlined, err = webarchive.InlineImages([]byte(article.Content), baseURL, resources)
 	if err != nil {
-		t.Fatalf("InlineImagesInHTML error: %v", err)
+		t.Fatalf("InlineImages error: %v", err)
 	}
+	article.Content = string(inlined)
 	if !strings.Contains(article.Content, "data:image/") {
 		t.Fatalf("expected data URLs before processContent")
 	}
@@ -58,12 +58,8 @@ func TestProcessContentWithWebarchiveImages(t *testing.T) {
 		t.Fatalf("processBase64ImageData error: %v", err)
 	}
 
-	blockedClient := &http.Client{
-		Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-			return nil, errors.New("network disabled by test")
-		}),
-	}
-	processed, imageCount, err := processContent(&article, baseURL, false, blockedClient)
+	resolver := NewWebarchiveImageResolver(resources)
+	processed, imageCount, err := processContent(&article, baseURL, false, resolver)
 	if err != nil {
 		t.Fatalf("processContent error: %v", err)
 	}
@@ -73,12 +69,6 @@ func TestProcessContentWithWebarchiveImages(t *testing.T) {
 	if !strings.Contains(processed.Content, "data:image/") {
 		t.Fatalf("expected data URLs after processContent")
 	}
-}
-
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
 }
 
 func extractFirstDataImage(html string) string {
