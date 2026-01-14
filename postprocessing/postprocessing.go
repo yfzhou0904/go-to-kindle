@@ -12,6 +12,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/internal/webarchive"
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
 
@@ -32,6 +33,15 @@ func ProcessArticleWithContext(ctx context.Context, resp *http.Response, exclude
 	article, err := readability.FromReader(resp.Body, resp.Request.URL)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to parse webpage: %v", err)
+	}
+
+	// If the input came from a webarchive, re-inline images after readability.
+	if baseURL, resources, ok := archiveFromContext(ctx, resp); ok {
+		inlined, err := webarchive.InlineImagesInHTML(article.Content, baseURL, resources)
+		if err != nil {
+			return nil, "", 0, fmt.Errorf("failed to inline webarchive images: %v", err)
+		}
+		article.Content = inlined
 	}
 
 	// Save readability-parsed content for debug if needed
@@ -63,6 +73,18 @@ func ProcessArticleWithContext(ctx context.Context, resp *http.Response, exclude
 	}
 
 	return processedArticle, filename, imageCount, nil
+}
+
+func archiveFromContext(ctx context.Context, resp *http.Response) (*url.URL, map[string]webarchive.Resource, bool) {
+	if baseURL, resources, ok := webarchive.GetArchive(ctx); ok {
+		return baseURL, resources, true
+	}
+	if resp != nil && resp.Request != nil {
+		if baseURL, resources, ok := webarchive.GetArchive(resp.Request.Context()); ok {
+			return baseURL, resources, true
+		}
+	}
+	return nil, nil, false
 }
 
 // processContent cleans up the article content by processing images and removing unwanted elements

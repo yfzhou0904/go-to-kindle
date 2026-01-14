@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
+	"github.com/yfzhou0904/go-to-kindle/internal/webarchive"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/retrieval"
 	"github.com/yfzhou0904/go-to-kindle/util"
@@ -24,6 +26,8 @@ import (
 func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http.Response, error) {
 	link := input
 	var resp *http.Response
+	var archiveBaseURL *url.URL
+	var archiveResources map[string]webarchive.Resource
 
 	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
 		// web url - use retrieval chain
@@ -58,18 +62,43 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http
 			return nil, fmt.Errorf("failed to resolve local file path: %v", err)
 		}
 
-		file, err := os.Open(absPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open local file: %v", err)
-		}
+		if strings.EqualFold(filepath.Ext(absPath), ".webarchive") {
+			raw, err := os.ReadFile(absPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read webarchive: %v", err)
+			}
+			htmlContent, baseURL, resources, err := webarchive.DecodeFile(raw)
+			if err != nil {
+				return nil, err
+			}
+			inlined, err := webarchive.InlineImages(htmlContent, baseURL, resources)
+			if err != nil {
+				return nil, err
+			}
+			if baseURL == nil {
+				baseURL = &url.URL{Path: link}
+			}
+			archiveBaseURL = baseURL
+			archiveResources = resources
+			req := &http.Request{URL: baseURL}
+			resp = &http.Response{
+				Body:    io.NopCloser(bytes.NewReader(inlined)),
+				Request: req,
+			}
+		} else {
+			file, err := os.Open(absPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open local file: %v", err)
+			}
 
-		resp = &http.Response{
-			Body: file,
-			Request: &http.Request{
-				URL: &url.URL{
-					Path: link,
+			resp = &http.Response{
+				Body: file,
+				Request: &http.Request{
+					URL: &url.URL{
+						Path: link,
+					},
 				},
-			},
+			}
 		}
 	}
 
@@ -88,6 +117,15 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*http
 
 		// Recreate the response body for further processing
 		resp.Body = io.NopCloser(strings.NewReader(string(rawContent)))
+	}
+
+	if archiveBaseURL != nil && archiveResources != nil {
+		req := resp.Request
+		if req == nil {
+			req = &http.Request{}
+		}
+		req = req.WithContext(webarchive.WithArchive(ctx, archiveBaseURL, archiveResources))
+		resp.Request = req
 	}
 
 	return resp, nil
