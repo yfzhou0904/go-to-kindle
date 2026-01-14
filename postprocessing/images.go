@@ -194,16 +194,7 @@ func processBase64ImageData(src string) (string, error) {
 }
 
 // processURLImageData downloads and processes a URL-based image and returns the processed data URL
-func processURLImageData(src string, baseURL *url.URL, client *http.Client) (string, error) {
-	// Download the image
-	imageData, _, err := downloadImage(src, baseURL, client)
-	if err != nil {
-		return "", err
-	}
-
-	// Process the image data
-	return processImageData(imageData)
-}
+// processURLImageData removed in favor of ImageResolver implementations.
 
 // extractURLFromDataAttrs parses Substack-style data-attrs to find the original image URL
 func extractURLFromDataAttrs(dataAttr string) string {
@@ -223,7 +214,7 @@ func extractURLFromDataAttrs(dataAttr string) string {
 
 // processPictureElements collapses each <picture> into a single <img>
 // selecting the best candidate from srcset or src attributes.
-func processPictureElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
+func processPictureElements(doc *goquery.Document, baseURL *url.URL, resolver ImageResolver) int {
 	processed := 0
 
 	// helper to choose largest width from a srcset
@@ -309,8 +300,8 @@ func processPictureElements(doc *goquery.Document, baseURL *url.URL, client *htt
 		var err error
 		if strings.HasPrefix(chosenURL, "data:image/") {
 			dataURL, err = processBase64ImageData(chosenURL)
-		} else if baseURL != nil {
-			dataURL, err = processURLImageData(chosenURL, baseURL, client)
+		} else if resolver != nil {
+			dataURL, _, err = resolver.ResolveImage(chosenURL, baseURL)
 		} else {
 			p.Remove()
 			return
@@ -333,7 +324,7 @@ func processPictureElements(doc *goquery.Document, baseURL *url.URL, client *htt
 }
 
 // processImageElements processes all img elements in the document (unified for web and local)
-func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
+func processImageElements(doc *goquery.Document, baseURL *url.URL, resolver ImageResolver) int {
 	processedCount := 0
 	doc.Find("img").Each(func(i int, s *goquery.Selection) {
 		if v, ok := s.Attr("data-processed"); ok && v == "1" {
@@ -359,8 +350,8 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.
 
 		if strings.HasPrefix(src, "data:image/") {
 			dataURL, err = processBase64ImageData(src)
-		} else if baseURL != nil {
-			dataURL, err = processURLImageData(src, baseURL, client)
+		} else if resolver != nil {
+			dataURL, _, err = resolver.ResolveImage(src, baseURL)
 		} else {
 			s.Remove()
 			return
@@ -379,7 +370,7 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL, client *http.
 }
 
 // processLoneSourceElements processes <source> tags that are not inside <picture>.
-func processLoneSourceElements(doc *goquery.Document, baseURL *url.URL, client *http.Client) int {
+func processLoneSourceElements(doc *goquery.Document, baseURL *url.URL, resolver ImageResolver) int {
 	processed := 0
 	doc.Find("source").Each(func(i int, s *goquery.Selection) {
 		if s.ParentsFiltered("picture").Length() > 0 {
@@ -408,8 +399,8 @@ func processLoneSourceElements(doc *goquery.Document, baseURL *url.URL, client *
 		var err error
 		if strings.HasPrefix(firstURL, "data:image/") {
 			dataURL, err = processBase64ImageData(firstURL)
-		} else if baseURL != nil {
-			dataURL, err = processURLImageData(firstURL, baseURL, client)
+		} else if resolver != nil {
+			dataURL, _, err = resolver.ResolveImage(firstURL, baseURL)
 		} else {
 			s.Remove()
 			return

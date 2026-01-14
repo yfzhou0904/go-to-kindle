@@ -11,4 +11,5 @@ Arguments:
 Examples:
   go-to-kindle
   go-to-kindle https://example.com/article
-  go-to-kindle /path/to/file.html`
+  go-to-kindle /path/to/file.html
+  go-to-kindle /path/to/page.webarchive`

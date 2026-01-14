@@ -5,7 +5,7 @@
 ## Features
 
 - **Interactive Terminal UI**: Modern Bubbletea-based interface with guided workflow
-- **Multiple Sources**: Supports web URLs (http/https) and local HTML files
+- **Multiple Sources**: Supports web URLs (http/https), local HTML files, and Safari .webarchive files
 - **Smart Processing**: Extracts readable content, processes images, detects language
 - **Robust Retrieval**: Optional headless browser mode for JS-heavy or blocked sites
 - **Image Support**: Optional image inclusion with automatic resizing (300px max)
@@ -109,7 +109,7 @@ go-to-kindle
 ```
 
 ### Input Options
-- **URL or File Path**: Web articles or local HTML files
+- **URL or File Path**: Web articles, local HTML files, or Safari .webarchive files
 - **Include Images**: Toggle to include resized images (300px max, base64 embedded)
 - **Use Headless Browser**: Handle JS-heavy or protected sites (slower but more reliable)
 
@@ -124,6 +124,7 @@ go-to-kindle
 - News articles from most websites
 - Blog posts and long-form content
 - Local HTML files
+- Safari .webarchive files
 - Content in English and Chinese (with proper word counting)
 
 ### Keyboard Shortcuts

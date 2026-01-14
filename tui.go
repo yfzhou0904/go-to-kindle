@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -47,8 +46,8 @@ type model struct {
 
 // Messages for async operations
 type retrievalCompleteMsg struct {
-	resp *http.Response
-	err  error
+	input *InputResult
+	err   error
 }
 
 type postProcessingCompleteMsg struct {
@@ -191,7 +190,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = completionScreen
 		} else {
 			m.state = postProcessingScreen
-			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.resp, m.excludeImages, m.debug))
+			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.input, m.excludeImages, m.debug))
 		}
 		return m, nil
 
@@ -338,7 +337,7 @@ func (m model) View() string {
 			return fmt.Sprintf(
 				"%s\n\n%s\n\n%s\n",
 				successStyle.Render("✅ Success!"),
-				"Article sent to your Kindle successfully.",
+				"Going to your kindle!",
 				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		}
@@ -354,19 +353,19 @@ func retrieveContentCmd(input string, useChromedp bool, debug bool) tea.Cmd {
 		if debug {
 			ctx = util.WithDebug(ctx, debug)
 		}
-		resp, err := retrieveContent(ctx, input, useChromedp)
-		return retrievalCompleteMsg{resp: resp, err: err}
+		result, err := retrieveContent(ctx, input, useChromedp)
+		return retrievalCompleteMsg{input: result, err: err}
 	}
 }
 
 // Command to process content
-func processContentCmd(resp *http.Response, excludeImages bool, debug bool) tea.Cmd {
+func processContentCmd(input *InputResult, excludeImages bool, debug bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		if debug {
 			ctx = util.WithDebug(ctx, debug)
 		}
-		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(ctx, resp, excludeImages)
+		article, filename, language, wordCount, imageCount, archivePath, err := postProcessContent(ctx, input, excludeImages)
 		return postProcessingCompleteMsg{article: article, filename: filename, archivePath: archivePath, language: language, wordCount: wordCount, imageCount: imageCount, err: err}
 	}
 }
