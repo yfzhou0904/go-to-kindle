@@ -106,6 +106,7 @@ func (r *NetworkImageResolver) ResolveImage(src string, baseURL *url.URL) (strin
 // WebarchiveImageResolver resolves images from embedded webarchive resources.
 type WebarchiveImageResolver struct {
 	resources map[string]webarchive.Resource
+	fallback  ImageResolver
 }
 
 // NewWebarchiveImageResolver creates a resolver backed by webarchive resources.
@@ -113,10 +114,19 @@ func NewWebarchiveImageResolver(resources map[string]webarchive.Resource) *Webar
 	return &WebarchiveImageResolver{resources: resources}
 }
 
+// WithFallback enables network fetching when a webarchive lacks a resource.
+func (r *WebarchiveImageResolver) WithFallback(fallback ImageResolver) *WebarchiveImageResolver {
+	r.fallback = fallback
+	return r
+}
+
 // ResolveImage resolves an image using embedded webarchive resources.
 func (r *WebarchiveImageResolver) ResolveImage(src string, baseURL *url.URL) (string, bool, error) {
 	dataURL, ok := webarchive.ResolveImageDataURL(src, baseURL, r.resources)
 	if !ok {
+		if r.fallback != nil {
+			return r.fallback.ResolveImage(src, baseURL)
+		}
 		return "", false, nil
 	}
 	processed, err := processBase64ImageData(dataURL)

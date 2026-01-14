@@ -70,10 +70,12 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*Inpu
 			if baseURL == nil {
 				baseURL = &url.URL{Path: link}
 			}
+			resolver := postprocessing.NewWebarchiveImageResolver(resources).
+				WithFallback(postprocessing.NewNetworkImageResolver(nil))
 			result = InputResult{
 				Body:     io.NopCloser(bytes.NewReader(htmlContent)),
 				BaseURL:  baseURL,
-				Resolver: postprocessing.NewWebarchiveImageResolver(resources),
+				Resolver: resolver,
 			}
 		} else {
 			file, err := os.Open(absPath)

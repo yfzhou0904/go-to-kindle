@@ -17,7 +17,7 @@ import (
 )
 
 func TestWebarchiveIntegration(t *testing.T) {
-	input, err := retrieveContent(context.Background(), "testdata/The Stick in the Stream – Rands in Repose.webarchive", false)
+	input, err := retrieveContent(context.Background(), "testdata/Test-Driven Development with an LLM for Fun and Profit | blog.yfzhou.webarchive", false)
 	if err != nil {
 		t.Fatalf("retrieveContent error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestWebarchiveIntegration(t *testing.T) {
 }
 
 func TestWebarchiveInlineThenReadability(t *testing.T) {
-	raw, err := os.ReadFile("testdata/The Stick in the Stream – Rands in Repose.webarchive")
+	raw, err := os.ReadFile("testdata/Test-Driven Development with an LLM for Fun and Profit | blog.yfzhou.webarchive")
 	if err != nil {
 		t.Fatalf("read webarchive: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestWebarchiveInlineThenReadability(t *testing.T) {
 }
 
 func TestWebarchiveReadabilityKeepsImages(t *testing.T) {
-	raw, err := os.ReadFile("testdata/The Stick in the Stream – Rands in Repose.webarchive")
+	raw, err := os.ReadFile("testdata/Test-Driven Development with an LLM for Fun and Profit | blog.yfzhou.webarchive")
 	if err != nil {
 		t.Fatalf("read webarchive: %v", err)
 	}
