@@ -337,7 +337,7 @@ func (m model) View() string {
 			return fmt.Sprintf(
 				"%s\n\n%s\n\n%s\n",
 				successStyle.Render("✅ Success!"),
-				"Article sent to your Kindle successfully.",
+				"Going to your kindle!",
 				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		}

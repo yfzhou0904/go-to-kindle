@@ -66,7 +66,7 @@ func createMockResponse(htmlPath string, baseURL string) (*http.Response, error)
 
 // TestProcessArticle_FromConfig runs tests based on configuration files
 func TestProcessArticle_FromConfig(t *testing.T) {
-	testDataDir := "../postprocessing_test"
+	testDataDir := "../testdata/postprocessing"
 
 	// Find all expected output files
 	expectedOutputsDir := filepath.Join(testDataDir, "expected_outputs")

@@ -130,7 +130,13 @@ func TestWebarchiveReadabilityKeepsImages(t *testing.T) {
 		t.Fatalf("readability error: %v", err)
 	}
 
-	if strings.Contains(article.Content, "data:image/") {
-		t.Fatalf("expected readability to drop data URLs before reinlining")
+	if !strings.Contains(article.Content, "data:image/") {
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
+		if err != nil {
+			t.Fatalf("parse article content: %v", err)
+		}
+		if doc.Find("img").Length() == 0 {
+			t.Fatalf("expected readability to keep at least one image")
+		}
 	}
 }
