@@ -212,6 +212,16 @@ func resolveResource(raw string, baseURL *url.URL, resources map[string]Resource
 		if res, ok := resources[parsed.String()]; ok {
 			return res, true
 		}
+		if alt := withJCRVariant(parsed, true); alt != nil {
+			if res, ok := resources[alt.String()]; ok {
+				return res, true
+			}
+		}
+		if alt := withJCRVariant(parsed, false); alt != nil {
+			if res, ok := resources[alt.String()]; ok {
+				return res, true
+			}
+		}
 		if parsed.Path != "" {
 			if stripped := stripSizeSuffix(parsed.Path); stripped != parsed.Path {
 				alt := *parsed
@@ -219,7 +229,20 @@ func resolveResource(raw string, baseURL *url.URL, resources map[string]Resource
 				if res, ok := resources[alt.String()]; ok {
 					return res, true
 				}
+				if alt2 := withJCRVariant(&alt, true); alt2 != nil {
+					if res, ok := resources[alt2.String()]; ok {
+						return res, true
+					}
+				}
+				if alt2 := withJCRVariant(&alt, false); alt2 != nil {
+					if res, ok := resources[alt2.String()]; ok {
+						return res, true
+					}
+				}
 			}
+		}
+		if res, ok := findResourceByAsset(parsed, resources); ok {
+			return res, true
 		}
 	}
 
@@ -228,6 +251,59 @@ func resolveResource(raw string, baseURL *url.URL, resources map[string]Resource
 	}
 
 	return Resource{}, false
+}
+
+func withJCRVariant(parsed *url.URL, useUnderscore bool) *url.URL {
+	if parsed == nil {
+		return nil
+	}
+	path := parsed.Path
+	if strings.Contains(path, "/_jcr_content/") && !useUnderscore {
+		out := *parsed
+		out.Path = strings.ReplaceAll(path, "/_jcr_content/", "/jcr:content/")
+		return &out
+	}
+	if strings.Contains(path, "/jcr:content/") && useUnderscore {
+		out := *parsed
+		out.Path = strings.ReplaceAll(path, "/jcr:content/", "/_jcr_content/")
+		return &out
+	}
+	return nil
+}
+
+func findResourceByAsset(parsed *url.URL, resources map[string]Resource) (Resource, bool) {
+	if parsed == nil || parsed.Path == "" {
+		return Resource{}, false
+	}
+	assetRoot := parsed.Path
+	if idx := strings.Index(assetRoot, "/jcr:content/"); idx != -1 {
+		assetRoot = assetRoot[:idx]
+	}
+	if idx := strings.Index(assetRoot, "/_jcr_content/"); idx != -1 {
+		assetRoot = assetRoot[:idx]
+	}
+	best := Resource{}
+	bestLen := 0
+	for _, res := range resources {
+		if res.URL == "" || !strings.HasPrefix(res.MIMEType, "image/") {
+			continue
+		}
+		resURL, err := url.Parse(res.URL)
+		if err != nil || resURL.Path == "" {
+			continue
+		}
+		if !strings.HasPrefix(resURL.Path, assetRoot) {
+			continue
+		}
+		if len(res.Data) > bestLen {
+			best = res
+			bestLen = len(res.Data)
+		}
+	}
+	if bestLen == 0 {
+		return Resource{}, false
+	}
+	return best, true
 }
 
 func resourceToDataURL(res Resource) (string, bool) {
