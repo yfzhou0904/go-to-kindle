@@ -13,7 +13,7 @@ import (
 )
 
 func TestProcessContentWithWebarchiveImages(t *testing.T) {
-	raw, err := os.ReadFile("../testdata/Test-Driven Development with an LLM for Fun and Profit | blog.yfzhou.webarchive")
+	raw, err := os.ReadFile("../testdata/Test-Driven Development with an LLM for Fun and Profit - blog.yfzhou.webarchive")
 	if err != nil {
 		t.Fatalf("read webarchive: %v", err)
 	}
