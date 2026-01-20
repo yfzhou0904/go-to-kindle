@@ -46,6 +46,29 @@ func TestInlineImagesRemovesExternalFallbacks(t *testing.T) {
 	}
 }
 
+func TestResolveImageDataURLPathFallback(t *testing.T) {
+	baseURL := mustParseURL(t, "https://example.com/article")
+	resources := map[string]Resource{
+		"https://cdn.example.net/wp-content/uploads/2026/01/image-1536x864.png": {
+			URL:      "https://cdn.example.net/wp-content/uploads/2026/01/image-1536x864.png",
+			MIMEType: "image/png",
+			Data:     []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
+		},
+	}
+
+	dataURL, ok := ResolveImageDataURL(
+		"https://origin.example.com/wp-content/uploads/2026/01/image-300x169.png",
+		baseURL,
+		resources,
+	)
+	if !ok {
+		t.Fatalf("expected path-based fallback to resolve image")
+	}
+	if !strings.Contains(dataURL, "data:image/png;base64,") {
+		t.Fatalf("expected data URL, got: %s", dataURL)
+	}
+}
+
 func mustParseURL(t *testing.T, raw string) *url.URL {
 	t.Helper()
 	u, err := url.Parse(raw)
