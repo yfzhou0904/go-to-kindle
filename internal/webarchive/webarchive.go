@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	pathpkg "path"
 	"strings"
 	"unicode/utf8"
 
@@ -212,6 +213,9 @@ func resolveResource(raw string, baseURL *url.URL, resources map[string]Resource
 		if res, ok := resources[parsed.String()]; ok {
 			return res, true
 		}
+		if res, ok := findResourceByPath(parsed.Path, resources); ok {
+			return res, true
+		}
 		if alt := withJCRVariant(parsed, true); alt != nil {
 			if res, ok := resources[alt.String()]; ok {
 				return res, true
@@ -238,6 +242,9 @@ func resolveResource(raw string, baseURL *url.URL, resources map[string]Resource
 					if res, ok := resources[alt2.String()]; ok {
 						return res, true
 					}
+				}
+				if res, ok := findResourceByPath(stripped, resources); ok {
+					return res, true
 				}
 			}
 		}
@@ -298,6 +305,51 @@ func findResourceByAsset(parsed *url.URL, resources map[string]Resource) (Resour
 		if len(res.Data) > bestLen {
 			best = res
 			bestLen = len(res.Data)
+		}
+	}
+	if bestLen == 0 {
+		return Resource{}, false
+	}
+	return best, true
+}
+
+func findResourceByPath(path string, resources map[string]Resource) (Resource, bool) {
+	if path == "" {
+		return Resource{}, false
+	}
+	best := Resource{}
+	bestLen := 0
+	stripped := stripSizeSuffix(path)
+	dir := pathpkg.Dir(stripped)
+	base := strings.TrimSuffix(pathpkg.Base(stripped), pathpkg.Ext(stripped))
+
+	for _, res := range resources {
+		if res.URL == "" || !strings.HasPrefix(res.MIMEType, "image/") {
+			continue
+		}
+		resURL, err := url.Parse(res.URL)
+		if err != nil || resURL.Path == "" {
+			continue
+		}
+		if resURL.Path == path || resURL.Path == stripped {
+			if len(res.Data) > bestLen {
+				best = res
+				bestLen = len(res.Data)
+			}
+			continue
+		}
+		if dir == "." || base == "" {
+			continue
+		}
+		if pathpkg.Dir(resURL.Path) != dir {
+			continue
+		}
+		resBase := strings.TrimSuffix(pathpkg.Base(resURL.Path), pathpkg.Ext(resURL.Path))
+		if resBase == base || stripSizeSuffix(resURL.Path) == stripped {
+			if len(res.Data) > bestLen {
+				best = res
+				bestLen = len(res.Data)
+			}
 		}
 	}
 	if bestLen == 0 {
