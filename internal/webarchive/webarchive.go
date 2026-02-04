@@ -213,6 +213,14 @@ func resolveResource(raw string, baseURL *url.URL, resources map[string]Resource
 		if res, ok := resources[parsed.String()]; ok {
 			return res, true
 		}
+		if alt := withSubstackFormatVariant(parsed); alt != nil {
+			if res, ok := resources[alt.String()]; ok {
+				return res, true
+			}
+		}
+		if res, ok := findSubstackResourceByInnerURL(parsed, resources); ok {
+			return res, true
+		}
 		if res, ok := findResourceByPath(parsed.Path, resources); ok {
 			return res, true
 		}
@@ -276,6 +284,76 @@ func withJCRVariant(parsed *url.URL, useUnderscore bool) *url.URL {
 		return &out
 	}
 	return nil
+}
+
+func withSubstackFormatVariant(parsed *url.URL) *url.URL {
+	if parsed == nil {
+		return nil
+	}
+	if !strings.Contains(parsed.Host, "substackcdn.com") {
+		return nil
+	}
+	if !strings.Contains(parsed.Path, "/image/fetch/") {
+		return nil
+	}
+	if !strings.Contains(parsed.Path, "f_auto") {
+		return nil
+	}
+	out := *parsed
+	out.Path = strings.Replace(out.Path, "f_auto", "f_webp", 1)
+	return &out
+}
+
+func findSubstackResourceByInnerURL(parsed *url.URL, resources map[string]Resource) (Resource, bool) {
+	if parsed == nil {
+		return Resource{}, false
+	}
+	if !strings.Contains(parsed.Host, "substackcdn.com") {
+		return Resource{}, false
+	}
+	if !strings.Contains(parsed.Path, "/image/fetch/") {
+		return Resource{}, false
+	}
+	idx := strings.LastIndex(parsed.Path, "/")
+	if idx == -1 || idx == len(parsed.Path)-1 {
+		return Resource{}, false
+	}
+	innerEnc := parsed.Path[idx+1:]
+	innerURL, err := url.PathUnescape(innerEnc)
+	if err != nil || innerURL == "" {
+		innerURL = innerEnc
+	}
+	best := Resource{}
+	bestLen := 0
+	for _, res := range resources {
+		if res.URL == "" || !strings.Contains(res.URL, "substackcdn.com/image/fetch/") {
+			continue
+		}
+		resURL, err := url.Parse(res.URL)
+		if err != nil {
+			continue
+		}
+		idx2 := strings.LastIndex(resURL.Path, "/")
+		if idx2 == -1 || idx2 == len(resURL.Path)-1 {
+			continue
+		}
+		resInnerEnc := resURL.Path[idx2+1:]
+		resInner, err := url.PathUnescape(resInnerEnc)
+		if err != nil || resInner == "" {
+			resInner = resInnerEnc
+		}
+		if resInner != innerURL {
+			continue
+		}
+		if len(res.Data) > bestLen {
+			best = res
+			bestLen = len(res.Data)
+		}
+	}
+	if bestLen == 0 {
+		return Resource{}, false
+	}
+	return best, true
 }
 
 func findResourceByAsset(parsed *url.URL, resources map[string]Resource) (Resource, bool) {
