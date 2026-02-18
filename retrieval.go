@@ -13,6 +13,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"mvdan.cc/sh/v3/shell"
+
 	"github.com/abadojack/whatlanggo"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
@@ -157,32 +159,13 @@ func postProcessContent(ctx context.Context, input *InputResult, excludeImages b
 // takes a file path string supplied by user dragging a file into terminal, or via copy-paste
 // returns a normalized absolute path that can be used to open the file
 func normalizeLocalPath(path string) string {
-	// Clean input - remove leading/trailing whitespace
 	clean := strings.TrimSpace(path)
 
-	// Remove surrounding quotes (drag-drop adds these)
-	if (strings.HasPrefix(clean, `"`) && strings.HasSuffix(clean, `"`)) ||
-		(strings.HasPrefix(clean, `'`) && strings.HasSuffix(clean, `'`)) {
-		clean = clean[1 : len(clean)-1]
+	// Use a shell parser to decode quoted/escaped paths from drag-and-drop/paste.
+	if fields, err := shell.Fields(clean, nil); err == nil && len(fields) == 1 {
+		return fields[0]
 	}
 
-	// Unescape common terminal-escaped characters
-	replacements := map[string]string{
-		"\\ ": " ",
-		"\\(": "(",
-		"\\)": ")",
-		"\\[": "[",
-		"\\]": "]",
-		"\\&": "&",
-		"\\;": ";",
-		"\\'": "'",
-		"\\?": "?",
-		"\\|": "|",
-	}
-
-	for escaped, unescaped := range replacements {
-		clean = strings.ReplaceAll(clean, escaped, unescaped)
-	}
-
+	// Fallback: keep trimmed input untouched if parsing fails.
 	return clean
 }

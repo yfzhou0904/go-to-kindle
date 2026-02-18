@@ -14,7 +14,9 @@ require (
 	github.com/mattn/go-ieproxy v0.0.12
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	golang.org/x/image v0.31.0
+	golang.org/x/net v0.44.0
 	howett.net/plist v1.0.0
+	mvdan.cc/sh/v3 v3.12.0
 )
 
 require (
@@ -44,7 +46,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 )
