@@ -243,9 +243,28 @@ func processPictureElements(doc *goquery.Document, baseURL *url.URL, resolver Im
 		return best
 	}
 
+	tryResolve := func(raw string) (string, bool) {
+		if raw == "" {
+			return "", false
+		}
+		if strings.HasPrefix(raw, "data:image/") {
+			dataURL, err := processBase64ImageData(raw)
+			return dataURL, err == nil
+		}
+		if resolver == nil {
+			return "", false
+		}
+		dataURL, ok, err := resolver.ResolveImage(raw, baseURL)
+		if err != nil || !ok {
+			return "", false
+		}
+		return dataURL, true
+	}
+
 	doc.Find("picture").Each(func(i int, p *goquery.Selection) {
 		img := p.Find("img").First()
-		var chosenURL, alt string
+		var alt string
+		candidates := make([]string, 0, 6)
 
 		if img.Length() > 0 {
 			if v, ok := img.Attr("alt"); ok {
@@ -253,60 +272,45 @@ func processPictureElements(doc *goquery.Document, baseURL *url.URL, resolver Im
 			}
 			if da, ok := img.Attr("data-attrs"); ok {
 				if u := extractURLFromDataAttrs(da); u != "" {
-					chosenURL = u
+					candidates = append(candidates, u)
 				}
 			}
-			if chosenURL == "" {
-				if ss, ok := img.Attr("srcset"); ok && strings.TrimSpace(ss) != "" {
-					chosenURL = pickBestFromSrcset(ss)
+			if ss, ok := img.Attr("srcset"); ok && strings.TrimSpace(ss) != "" {
+				if u := pickBestFromSrcset(ss); u != "" {
+					candidates = append(candidates, u)
 				}
 			}
-			if chosenURL == "" {
-				if s, ok := img.Attr("src"); ok {
-					chosenURL = s
-				}
+			if s, ok := img.Attr("src"); ok && s != "" {
+				candidates = append(candidates, s)
 			}
 		}
 
-		if chosenURL == "" {
-			p.Find("source").EachWithBreak(func(_ int, s *goquery.Selection) bool {
-				if ss, ok := s.Attr("srcset"); ok && ss != "" {
-					u := pickBestFromSrcset(ss)
-					if u != "" {
-						if t, ok := s.Attr("type"); ok && strings.Contains(t, "webp") {
-							if chosenURL == "" {
-								chosenURL = u
-							}
-							return true
-						}
-						chosenURL = u
-						return false
-					}
+		p.Find("source").Each(func(_ int, s *goquery.Selection) {
+			if ss, ok := s.Attr("srcset"); ok && ss != "" {
+				if u := pickBestFromSrcset(ss); u != "" {
+					candidates = append(candidates, u)
 				}
-				if src, ok := s.Attr("src"); ok && src != "" {
-					chosenURL = src
-					return false
-				}
-				return true
-			})
-		}
+			}
+			if src, ok := s.Attr("src"); ok && src != "" {
+				candidates = append(candidates, src)
+			}
+		})
 
-		if chosenURL == "" {
+		if len(candidates) == 0 {
 			p.Remove()
 			return
 		}
 
 		var dataURL string
-		var err error
-		if strings.HasPrefix(chosenURL, "data:image/") {
-			dataURL, err = processBase64ImageData(chosenURL)
-		} else if resolver != nil {
-			dataURL, _, err = resolver.ResolveImage(chosenURL, baseURL)
-		} else {
-			p.Remove()
-			return
+		resolved := false
+		for _, cand := range candidates {
+			if out, ok := tryResolve(cand); ok {
+				dataURL = out
+				resolved = true
+				break
+			}
 		}
-		if err != nil {
+		if !resolved {
 			p.Remove()
 			return
 		}
@@ -334,36 +338,50 @@ func processImageElements(doc *goquery.Document, baseURL *url.URL, resolver Imag
 		}
 
 		src, exists := s.Attr("src")
+		candidates := make([]string, 0, 2)
 		if da, ok := s.Attr("data-attrs"); ok {
 			if u := extractURLFromDataAttrs(da); u != "" {
-				src = u
-				exists = true
+				candidates = append(candidates, u)
 			}
 		}
-		if !exists || src == "" {
+		if exists && src != "" {
+			candidates = append(candidates, src)
+		}
+		if len(candidates) == 0 {
 			s.Remove()
 			return
 		}
 
 		var dataURL string
-		var err error
-
-		if strings.HasPrefix(src, "data:image/") {
-			dataURL, err = processBase64ImageData(src)
-		} else if resolver != nil {
-			dataURL, _, err = resolver.ResolveImage(src, baseURL)
-		} else {
+		resolved := false
+		for _, cand := range candidates {
+			if strings.HasPrefix(cand, "data:image/") {
+				out, err := processBase64ImageData(cand)
+				if err == nil {
+					dataURL = out
+					resolved = true
+					break
+				}
+				continue
+			}
+			if resolver == nil {
+				continue
+			}
+			out, ok, err := resolver.ResolveImage(cand, baseURL)
+			if err == nil && ok {
+				dataURL = out
+				resolved = true
+				break
+			}
+		}
+		if !resolved {
 			s.Remove()
 			return
 		}
 
-		if err == nil {
-			s.SetAttr("src", dataURL)
-			removeImageAttributes(s)
-			processedCount++
-		} else {
-			s.Remove()
-		}
+		s.SetAttr("src", dataURL)
+		removeImageAttributes(s)
+		processedCount++
 	})
 
 	return processedCount
