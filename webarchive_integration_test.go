@@ -17,7 +17,7 @@ import (
 )
 
 func TestWebarchiveIntegration(t *testing.T) {
-	input, err := retrieveContent(context.Background(), "testdata/Test-Driven Development with an LLM for Fun and Profit - blog.yfzhou.webarchive", false)
+	input, err := retrieveContent(context.Background(), "testdata/Test-Driven Development with an LLM for Fun and Profit - blog.yfzhou.webarchive", false, true)
 	if err != nil {
 		t.Fatalf("retrieveContent error: %v", err)
 	}
