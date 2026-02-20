@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/abadojack/whatlanggo"
+	"github.com/mattn/go-shellwords"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
 	"github.com/yfzhou0904/go-to-kindle/internal/webarchive"
@@ -23,7 +24,7 @@ import (
 )
 
 // retrieveContent handles both web URLs and local files, returning a normalized input result.
-func retrieveContent(ctx context.Context, input string, useChromedp bool) (*InputResult, error) {
+func retrieveContent(ctx context.Context, input string, useChromedp bool, inputFromCLI bool) (*InputResult, error) {
 	link := input
 	var result InputResult
 
@@ -53,7 +54,11 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool) (*Inpu
 			Resolver: postprocessing.NewNetworkImageResolver(nil),
 		}
 	} else {
-		absPath, err := filepath.Abs(normalizeLocalPath(link))
+		normalized, err := normalizeLocalPath(link, inputFromCLI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse file path: %v", err)
+		}
+		absPath, err := filepath.Abs(normalized)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve local file path: %v", err)
 		}
@@ -154,35 +159,24 @@ func postProcessContent(ctx context.Context, input *InputResult, excludeImages b
 	return article, filename, lang.String(), wordCount, imageCount, archivePath, nil
 }
 
-// takes a file path string supplied by user dragging a file into terminal, or via copy-paste
-// returns a normalized absolute path that can be used to open the file
-func normalizeLocalPath(path string) string {
-	// Clean input - remove leading/trailing whitespace
+// normalizeLocalPath parses a file path string supplied by the user via drag-and-drop
+// or copy-paste into the terminal. The input is treated as a POSIX shell-quoted token,
+// so backslash escapes and surrounding quotes are handled correctly.
+// Returns an error if the input cannot be parsed (e.g. unterminated quote).
+func normalizeLocalPath(path string, alreadyUnescaped bool) (string, error) {
 	clean := strings.TrimSpace(path)
-
-	// Remove surrounding quotes (drag-drop adds these)
-	if (strings.HasPrefix(clean, `"`) && strings.HasSuffix(clean, `"`)) ||
-		(strings.HasPrefix(clean, `'`) && strings.HasSuffix(clean, `'`)) {
-		clean = clean[1 : len(clean)-1]
+	if alreadyUnescaped {
+		return clean, nil
 	}
-
-	// Unescape common terminal-escaped characters
-	replacements := map[string]string{
-		"\\ ": " ",
-		"\\(": "(",
-		"\\)": ")",
-		"\\[": "[",
-		"\\]": "]",
-		"\\&": "&",
-		"\\;": ";",
-		"\\'": "'",
-		"\\?": "?",
-		"\\|": "|",
+	args, err := shellwords.Parse(clean)
+	if err != nil {
+		return "", fmt.Errorf("could not parse path as shell-quoted string: %w", err)
 	}
-
-	for escaped, unescaped := range replacements {
-		clean = strings.ReplaceAll(clean, escaped, unescaped)
+	if len(args) == 0 {
+		return "", fmt.Errorf("empty path")
 	}
-
-	return clean
+	if len(args) > 1 {
+		return "", fmt.Errorf("path contains unescaped spaces; wrap it in quotes or escape spaces with \\")
+	}
+	return args[0], nil
 }

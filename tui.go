@@ -42,6 +42,7 @@ type model struct {
 	useChromedp     bool
 	debug           bool
 	checkboxFocused int // 0 = url input, 1 = include images, 2 = use chromedp
+	inputFromCLI    bool // true when input was supplied as a CLI arg (already shell-unescaped)
 }
 
 // Messages for async operations
@@ -75,10 +76,12 @@ var (
 // ModelOption represents a configuration option for initialModel
 type ModelOption func(*model)
 
-// WithURL sets the initial URL value
+// WithURL sets the initial URL value and marks it as coming from the CLI
+// (already shell-unescaped by the invoking shell).
 func WithURL(url string) ModelOption {
 	return func(m *model) {
 		m.urlInput.SetValue(url)
+		m.inputFromCLI = true
 	}
 }
 
@@ -167,7 +170,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case inputScreen:
 				if m.urlInput.Value() != "" {
 					m.state = retrievalScreen
-					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.useChromedp, m.debug))
+					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.useChromedp, m.debug, m.inputFromCLI))
+
 				}
 			case editScreen:
 				// Update title if changed
@@ -347,13 +351,13 @@ func (m model) View() string {
 }
 
 // Command to retrieve content
-func retrieveContentCmd(input string, useChromedp bool, debug bool) tea.Cmd {
+func retrieveContentCmd(input string, useChromedp bool, debug bool, inputFromCLI bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		if debug {
 			ctx = util.WithDebug(ctx, debug)
 		}
-		result, err := retrieveContent(ctx, input, useChromedp)
+		result, err := retrieveContent(ctx, input, useChromedp, inputFromCLI)
 		return retrievalCompleteMsg{input: result, err: err}
 	}
 }
