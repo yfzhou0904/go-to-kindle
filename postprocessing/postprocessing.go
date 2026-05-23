@@ -179,7 +179,9 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 	return article, imageCount, nil
 }
 
-// TitleToFilename replaces problematic characters in page title to give a generally valid filename
+const maxFilenameBaseBytes = 200
+
+// TitleToFilename replaces problematic characters in page title to give a generally valid filename.
 func TitleToFilename(title string) string {
 	filename := strings.ReplaceAll(title, "/", "_")
 	filename = strings.ReplaceAll(filename, "\\", "_")
@@ -190,5 +192,22 @@ func TitleToFilename(title string) string {
 	filename = strings.ReplaceAll(filename, "<", "_")
 	filename = strings.ReplaceAll(filename, ">", "_")
 	filename = strings.ReplaceAll(filename, "|", "_")
+	filename = truncateStringBytes(filename, maxFilenameBaseBytes)
 	return filename + ".html"
+}
+
+func truncateStringBytes(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	var b strings.Builder
+	for _, r := range s {
+		runeString := string(r)
+		if b.Len()+len(runeString) > maxBytes {
+			break
+		}
+		b.WriteString(runeString)
+	}
+	return b.String()
 }

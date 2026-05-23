@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/yfzhou0904/go-to-kindle/postprocessing_test"
 )
@@ -200,4 +201,39 @@ func TestProcessArticle_Basic(t *testing.T) {
 	}
 
 	t.Logf("Basic test passed - Title: %s, Images: %d", article.Title, imageCount)
+}
+
+func TestTitleToFilenameSanitizesAndTruncates(t *testing.T) {
+	title := strings.Repeat("a", maxFilenameBaseBytes+50)
+
+	filename := TitleToFilename(title)
+
+	if len(strings.TrimSuffix(filename, ".html")) != maxFilenameBaseBytes {
+		t.Fatalf("expected filename basename to be %d bytes, got %d", maxFilenameBaseBytes, len(strings.TrimSuffix(filename, ".html")))
+	}
+	if !strings.HasSuffix(filename, ".html") {
+		t.Fatalf("expected .html suffix, got %q", filename)
+	}
+}
+
+func TestTitleToFilenameDoesNotSplitMultibyteRunes(t *testing.T) {
+	title := strings.Repeat("你", 100)
+
+	filename := TitleToFilename(title)
+	basename := strings.TrimSuffix(filename, ".html")
+
+	if len(basename) > maxFilenameBaseBytes {
+		t.Fatalf("expected basename at most %d bytes, got %d", maxFilenameBaseBytes, len(basename))
+	}
+	if !utf8.ValidString(basename) {
+		t.Fatalf("expected valid UTF-8 basename, got %q", basename)
+	}
+}
+
+func TestTitleToFilenameReplacesProblematicCharacters(t *testing.T) {
+	filename := TitleToFilename(`a/b\c:d*e?f"g<h>i|j`)
+
+	if filename != "a_b_c_d_e_f_g_h_i_j.html" {
+		t.Fatalf("unexpected filename: %q", filename)
+	}
 }

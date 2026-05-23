@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	readability "github.com/go-shiori/go-readability"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/util"
@@ -41,8 +42,9 @@ type model struct {
 	excludeImages   bool
 	useChromedp     bool
 	debug           bool
-	checkboxFocused int // 0 = url input, 1 = include images, 2 = use chromedp
+	checkboxFocused int  // 0 = url input, 1 = include images, 2 = use chromedp
 	inputFromCLI    bool // true when input was supplied as a CLI arg (already shell-unescaped)
+	width           int
 }
 
 // Messages for async operations
@@ -224,6 +226,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		inputWidth := max(m.contentWidth(), 20)
+		m.urlInput.Width = inputWidth
+		m.titleInput.Width = inputWidth
+		return m, nil
 	}
 
 	// Update inputs based on current screen
@@ -239,6 +248,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m model) contentWidth() int {
+	if m.width <= 0 {
+		return 80
+	}
+	return max(m.width-2, 20)
+}
+
+func (m model) wrapText(s string) string {
+	return ansi.Wrap(s, m.contentWidth(), " /:_")
 }
 
 func (m model) View() string {
@@ -321,8 +341,8 @@ func (m model) View() string {
 		return fmt.Sprintf(
 			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
 			headerStyle.Render("✏️  Edit Article Title"),
-			subtleStyle.Render(fmt.Sprintf("Original: %s", m.article.Title)),
-			subtleStyle.Render(metadata),
+			subtleStyle.Render(m.wrapText(fmt.Sprintf("Original: %s", m.article.Title))),
+			subtleStyle.Render(m.wrapText(metadata)),
 			m.titleInput.View(),
 			subtleStyle.Render("Press Enter to send to Kindle • Edit title or keep as-is"),
 			subtleStyle.Render("Ctrl+C to quit"),
@@ -333,8 +353,8 @@ func (m model) View() string {
 			return fmt.Sprintf(
 				"%s\n\n%s\n\n%s\n\n%s\n",
 				errorStyle.Render("❌ Error"),
-				m.err.Error(),
-				subtleStyle.Render(fmt.Sprintf("Original URL: %s", m.urlInput.Value())),
+				errorStyle.Render(m.wrapText(m.err.Error())),
+				subtleStyle.Render(m.wrapText(fmt.Sprintf("Original URL: %s", m.urlInput.Value()))),
 				subtleStyle.Render("Press Enter to send another • Esc/Ctrl+C to quit"),
 			)
 		} else {
