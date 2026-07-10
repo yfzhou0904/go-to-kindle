@@ -59,7 +59,7 @@ func TestProcessContentWithWebarchiveImages(t *testing.T) {
 	}
 
 	resolver := NewWebarchiveImageResolver(resources)
-	processed, imageCount, err := processContent(&article, baseURL, false, resolver)
+	processed, imageCount, err := processContent(&article, baseURL, false, resolver, false)
 	if err != nil {
 		t.Fatalf("processContent error: %v", err)
 	}

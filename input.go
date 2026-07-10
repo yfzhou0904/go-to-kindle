@@ -9,7 +9,16 @@ import (
 
 // InputResult represents normalized input ready for processing.
 type InputResult struct {
+	Kind     InputKind
+	Source   string
 	Body     io.ReadCloser
 	BaseURL  *url.URL
 	Resolver postprocessing.ImageResolver
 }
+
+type InputKind int
+
+const (
+	InputHTML InputKind = iota
+	InputMarkdown
+)

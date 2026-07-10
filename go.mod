@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/abadojack/whatlanggo v1.0.1
+	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.9
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -15,6 +16,7 @@ require (
 	github.com/mattn/go-ieproxy v0.0.12
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	github.com/yuin/goldmark v1.8.2
 	golang.org/x/image v0.31.0
 	golang.org/x/net v0.44.0
 	howett.net/plist v1.0.0
@@ -23,7 +25,6 @@ require (
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
-	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/colorprofile v0.3.2 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect

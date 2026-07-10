@@ -67,7 +67,7 @@ func ProcessArticleWithContext(ctx context.Context, resp *http.Response, exclude
 	}
 
 	// Post-process the article content
-	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, resolver)
+	processedArticle, imageCount, err := processContent(&article, resp.Request.URL, excludeImages, resolver, false)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to post-process article: %v", err)
 	}
@@ -137,7 +137,7 @@ func (r *WebarchiveImageResolver) ResolveImage(src string, baseURL *url.URL) (st
 }
 
 // processContent cleans up the article content by processing images and removing unwanted elements
-func processContent(article *readability.Article, baseURL *url.URL, excludeImages bool, resolver ImageResolver) (*readability.Article, int, error) {
+func processContent(article *readability.Article, baseURL *url.URL, excludeImages bool, resolver ImageResolver, preserveLinks bool) (*readability.Article, int, error) {
 	contentDoc, err := goquery.NewDocumentFromReader(strings.NewReader(article.Content))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to parse content: %v", err)
@@ -166,10 +166,12 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 	contentDoc.Find("svg").Remove()
 
 	// Remove <a> tags but keep their contents (text, images, etc.)
-	contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
-		html, _ := s.Html()
-		s.ReplaceWithHtml(html)
-	})
+	if !preserveLinks {
+		contentDoc.Find("a").Each(func(i int, s *goquery.Selection) {
+			html, _ := s.Html()
+			s.ReplaceWithHtml(html)
+		})
+	}
 
 	article.Content, err = contentDoc.Find("body").Html()
 	if err != nil {
