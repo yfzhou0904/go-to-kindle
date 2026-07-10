@@ -42,8 +42,9 @@ type model struct {
 	excludeImages   bool
 	useChromedp     bool
 	debug           bool
-	checkboxFocused int  // 0 = url input, 1 = include images, 2 = use chromedp
+	checkboxFocused int  // 0 = URL input, 1 = clipboard, 2 = images, 3 = browser
 	inputFromCLI    bool // true when input was supplied as a CLI arg (already shell-unescaped)
+	inputSource     string
 	width           int
 }
 
@@ -138,7 +139,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "tab", "down":
 			if m.state == inputScreen {
-				m.checkboxFocused = (m.checkboxFocused + 1) % 3
+				m.checkboxFocused = (m.checkboxFocused + 1) % 4
 				if m.checkboxFocused == 0 {
 					m.urlInput.Focus()
 				} else {
@@ -147,7 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "up":
 			if m.state == inputScreen {
-				m.checkboxFocused = (m.checkboxFocused + 2) % 3
+				m.checkboxFocused = (m.checkboxFocused + 3) % 4
 				if m.checkboxFocused == 0 {
 					m.urlInput.Focus()
 				} else {
@@ -157,9 +158,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case " ":
 			if m.state == inputScreen {
 				switch m.checkboxFocused {
-				case 1:
-					m.excludeImages = !m.excludeImages
 				case 2:
+					m.excludeImages = !m.excludeImages
+				case 3:
 					m.useChromedp = !m.useChromedp
 				}
 			}
@@ -167,10 +168,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == completionScreen {
 				return m, tea.Quit
 			}
+			if m.state == editScreen {
+				initial := initialModel()
+				return initial, initial.spinner.Tick
+			}
 		case "enter":
 			switch m.state {
 			case inputScreen:
-				if m.urlInput.Value() != "" {
+				if m.checkboxFocused == 1 {
+					m.state = retrievalScreen
+					return m, tea.Batch(m.spinner.Tick, retrieveClipboardContentCmd())
+				}
+				if m.checkboxFocused == 0 && m.urlInput.Value() != "" {
 					m.state = retrievalScreen
 					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.useChromedp, m.debug, m.inputFromCLI))
 
@@ -195,6 +204,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			m.state = completionScreen
 		} else {
+			m.inputSource = msg.input.Source
 			m.state = postProcessingScreen
 			return m, tea.Batch(m.spinner.Tick, processContentCmd(msg.input, m.excludeImages, m.debug))
 		}
@@ -274,12 +284,15 @@ func (m model) View() string {
 			browserCheckbox = "☑"
 		}
 
+		clipboardStyle := subtleStyle
 		excludeImagesStyle := subtleStyle
 		browserStyle := subtleStyle
 		switch m.checkboxFocused {
 		case 1:
-			excludeImagesStyle = headerStyle
+			clipboardStyle = headerStyle
 		case 2:
+			excludeImagesStyle = headerStyle
+		case 3:
 			browserStyle = headerStyle
 		}
 
@@ -290,23 +303,32 @@ func (m model) View() string {
 			proxyDisplay = fmt.Sprintf("\n\n%s", subtleStyle.Render(fmt.Sprintf("🌐 Proxy detected: %s (from %s)", proxyInfo.URL, proxyInfo.Source)))
 		}
 
+		browserControl := fmt.Sprintf("\n%s %s", browserStyle.Render(browserCheckbox), browserStyle.Render("Use browser"))
+		if m.checkboxFocused == 1 {
+			browserControl = ""
+		}
+
 		return fmt.Sprintf(
-			"%s\n\n%s\n\n%s %s\n%s %s%s\n\n%s\n",
+			"%s\n\n%s\n\n%s\n\n%s %s%s%s\n\n%s\n",
 			headerStyle.Render("📚 Go to Kindle"),
 			m.urlInput.View(),
+			clipboardStyle.Render("▸ Read Markdown from clipboard"),
 			excludeImagesStyle.Render(excludeImagesCheckbox),
 			excludeImagesStyle.Render("Exclude images"),
-			browserStyle.Render(browserCheckbox),
-			browserStyle.Render("Use browser"),
+			browserControl,
 			proxyDisplay,
-			subtleStyle.Render("Press Enter to fetch • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
+			subtleStyle.Render("Enter to select • Tab/↑↓ to navigate • Space to toggle • Ctrl+C to quit"),
 		)
 
 	case retrievalScreen:
+		message := "🔍 Retrieving content..."
+		if m.checkboxFocused == 1 {
+			message = "📋 Reading Markdown from clipboard..."
+		}
 		return fmt.Sprintf(
 			"%s %s\n\n%s\n",
 			m.spinner.View(),
-			"🔍 Retrieving content...",
+			message,
 			subtleStyle.Render("Ctrl+C to quit"),
 		)
 
@@ -330,13 +352,17 @@ func (m model) View() string {
 		// Make file path clickable using OSC 8 hyperlink escape sequence
 		clickableFilePath := fmt.Sprintf("\033]8;;file://%s\033\\%s\033]8;;\033\\", m.archivePath, m.archivePath)
 
+		source := m.inputSource
+		if source == "" {
+			source = "Web / file"
+		}
 		var metadata string
 		if !m.excludeImages && m.imageCount > 0 {
-			metadata = fmt.Sprintf("Language: %s • Words: %d • Images: %d • File: %s",
-				m.language, m.wordCount, m.imageCount, clickableFilePath)
+			metadata = fmt.Sprintf("Source: %s • Language: %s • Words: %d • Images: %d • File: %s",
+				source, m.language, m.wordCount, m.imageCount, clickableFilePath)
 		} else {
-			metadata = fmt.Sprintf("Language: %s • Words: %d • File: %s",
-				m.language, m.wordCount, clickableFilePath)
+			metadata = fmt.Sprintf("Source: %s • Language: %s • Words: %d • File: %s",
+				source, m.language, m.wordCount, clickableFilePath)
 		}
 		return fmt.Sprintf(
 			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
@@ -345,7 +371,7 @@ func (m model) View() string {
 			subtleStyle.Render(m.wrapText(metadata)),
 			m.titleInput.View(),
 			subtleStyle.Render("Press Enter to send to Kindle • Edit title or keep as-is"),
-			subtleStyle.Render("Ctrl+C to quit"),
+			subtleStyle.Render("Esc to go back • Ctrl+C to quit"),
 		)
 
 	case completionScreen:
@@ -378,6 +404,13 @@ func retrieveContentCmd(input string, useChromedp bool, debug bool, inputFromCLI
 			ctx = util.WithDebug(ctx, debug)
 		}
 		result, err := retrieveContent(ctx, input, useChromedp, inputFromCLI)
+		return retrievalCompleteMsg{input: result, err: err}
+	}
+}
+
+func retrieveClipboardContentCmd() tea.Cmd {
+	return func() tea.Msg {
+		result, err := retrieveClipboardContent()
 		return retrievalCompleteMsg{input: result, err: err}
 	}
 }

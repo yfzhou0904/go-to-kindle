@@ -5,7 +5,7 @@
 ## Features
 
 - **Interactive Terminal UI**: Modern Bubbletea-based interface with guided workflow
-- **Multiple Sources**: Supports web URLs (http/https), local HTML files, and Safari .webarchive files
+- **Multiple Sources**: Supports web URLs, local HTML/Markdown files, Safari .webarchive files, and Markdown from the clipboard
 - **Smart Processing**: Extracts readable content, processes images, detects language
 - **Robust Retrieval**: Optional headless browser mode for JS-heavy or blocked sites
 - **Image Support**: Optional image inclusion with automatic resizing (300px max)
@@ -34,7 +34,7 @@
 ```
 
 The tool provides an intuitive 5-step workflow:
-1. **Input & Options**: Enter URL/file path, toggle image inclusion and headless browser
+1. **Input & Options**: Enter a URL/file path or read Markdown from the clipboard
 2. **Content Retrieval**: Fetch content using direct HTTP or the headless browser with progress indicator
 3. **Content Processing**: Readability extraction, image processing, and content cleaning
 4. **Review & Edit**: Check metadata (language, word count, images) and customize title
@@ -109,7 +109,8 @@ go-to-kindle
 ```
 
 ### Input Options
-- **URL or File Path**: Web articles, local HTML files, or Safari .webarchive files
+- **URL or File Path**: Web articles, local HTML/Markdown files, or Safari `.webarchive` files
+- **Clipboard Markdown**: Copy Markdown, focus **Read Markdown from clipboard**, and press Enter
 - **Include Images**: Toggle to include resized images (300px max, base64 embedded)
 - **Use Headless Browser**: Handle JS-heavy or protected sites (slower but more reliable)
 
@@ -124,6 +125,7 @@ go-to-kindle
 - News articles from most websites
 - Blog posts and long-form content
 - Local HTML files
+- Local Markdown files and Markdown copied from LLM interfaces
 - Safari .webarchive files
 - Content in English and Chinese (with proper word counting)
 

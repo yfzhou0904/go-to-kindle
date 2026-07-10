@@ -14,14 +14,35 @@ import (
 	"unicode/utf8"
 
 	"github.com/abadojack/whatlanggo"
-	"github.com/mattn/go-shellwords"
+	"github.com/atotto/clipboard"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/mattn/go-shellwords"
 	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
 	"github.com/yfzhou0904/go-to-kindle/internal/webarchive"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/retrieval"
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
+
+var readClipboard = clipboard.ReadAll
+
+func retrieveClipboardContent() (*InputResult, error) {
+	contents, err := readClipboard()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read clipboard: %w", err)
+	}
+	if strings.TrimSpace(contents) == "" {
+		return nil, fmt.Errorf("clipboard is empty")
+	}
+
+	return &InputResult{
+		Kind:     InputMarkdown,
+		Source:   "Clipboard Markdown",
+		Body:     io.NopCloser(strings.NewReader(contents)),
+		BaseURL:  &url.URL{},
+		Resolver: postprocessing.NewNetworkImageResolver(nil),
+	}, nil
+}
 
 // retrieveContent handles both web URLs and local files, returning a normalized input result.
 func retrieveContent(ctx context.Context, input string, useChromedp bool, inputFromCLI bool) (*InputResult, error) {
@@ -49,6 +70,8 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool, inputF
 		}
 
 		result = InputResult{
+			Kind:     InputHTML,
+			Source:   "Web",
 			Body:     retrievalResult.Content,
 			BaseURL:  retrievalResult.URL,
 			Resolver: postprocessing.NewNetworkImageResolver(nil),
@@ -78,6 +101,8 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool, inputF
 			resolver := postprocessing.NewWebarchiveImageResolver(resources).
 				WithFallback(postprocessing.NewNetworkImageResolver(nil))
 			result = InputResult{
+				Kind:     InputHTML,
+				Source:   "Webarchive file",
 				Body:     io.NopCloser(bytes.NewReader(htmlContent)),
 				BaseURL:  baseURL,
 				Resolver: resolver,
@@ -87,8 +112,16 @@ func retrieveContent(ctx context.Context, input string, useChromedp bool, inputF
 			if err != nil {
 				return nil, fmt.Errorf("failed to open local file: %v", err)
 			}
+			kind := InputHTML
+			source := "HTML file"
+			if ext := strings.ToLower(filepath.Ext(absPath)); ext == ".md" || ext == ".markdown" {
+				kind = InputMarkdown
+				source = "Markdown file"
+			}
 			result = InputResult{
-				Body: file,
+				Kind:   kind,
+				Source: source,
+				Body:   file,
 				BaseURL: &url.URL{
 					Path: link,
 				},
@@ -128,7 +161,15 @@ func postProcessContent(ctx context.Context, input *InputResult, excludeImages b
 		},
 	}
 
-	article, filename, imageCount, err := postprocessing.ProcessArticleWithContext(ctx, resp, excludeImages, input.Resolver)
+	var article *readability.Article
+	var filename string
+	var imageCount int
+	var err error
+	if input.Kind == InputMarkdown {
+		article, filename, imageCount, err = postprocessing.ProcessMarkdownWithContext(ctx, resp, excludeImages, input.Resolver)
+	} else {
+		article, filename, imageCount, err = postprocessing.ProcessArticleWithContext(ctx, resp, excludeImages, input.Resolver)
+	}
 	if err != nil {
 		return nil, "", "", 0, 0, "", fmt.Errorf("failed to process article: %v", err)
 	}
@@ -142,11 +183,11 @@ func postProcessContent(ctx context.Context, input *InputResult, excludeImages b
 	})
 	wordCount := 0
 	if lang == whatlanggo.Cmn {
-		wordCount = utf8.RuneCountInString(article.Content)
+		wordCount = utf8.RuneCountInString(article.TextContent)
 	} else {
-		wordCount = len(strings.Fields(article.Content))
+		wordCount = len(strings.Fields(article.TextContent))
 	}
-	if wordCount < 100 {
+	if input.Kind != InputMarkdown && wordCount < 100 {
 		return nil, "", "", 0, 0, "", fmt.Errorf("article is too short (%d words)", wordCount)
 	}
 

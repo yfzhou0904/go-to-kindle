@@ -30,7 +30,13 @@ const htmlTemplate = `<!DOCTYPE html>
         <title>{{.Title}}</title>
         <meta name="author" content="{{.Author}}">
        <style>
-               img { display: block; margin-left: auto; margin-right: auto; }
+               body { line-height: 1.5; }
+               img { display: block; max-width: 100%; height: auto; margin-left: auto; margin-right: auto; }
+               pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 0.75em; background: #f3f3f3; }
+               code { font-family: monospace; }
+               table { width: 100%; border-collapse: collapse; }
+               th, td { border: 1px solid #999; padding: 0.35em; text-align: left; }
+               blockquote { margin-left: 0; padding-left: 1em; border-left: 3px solid #999; }
        </style>
 </head>
 <body>
