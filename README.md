@@ -33,7 +33,7 @@
 └─────────────────┘    └──────────────────┘
 ```
 
-The tool provides an intuitive 5-step workflow:
+The tool provides an intuitive workflow:
 1. **Input & Options**: Enter a URL/file path or read Markdown from the clipboard
 2. **Content Retrieval**: Fetch content using direct HTTP or the headless browser with progress indicator
 3. **Content Processing**: Readability extraction, image processing, and content cleaning
@@ -42,7 +42,7 @@ The tool provides an intuitive 5-step workflow:
 
 ## Requirements
 
-- Go 1.21 or newer
+- Go 1.25 or newer
 - Email account with SMTP access (Gmail, Outlook, etc.)
 - Kindle device with email delivery enabled
 
@@ -70,12 +70,12 @@ make
 On first run, the tool will create a configuration file at `~/.go-to-kindle/config.toml` and open it in your default editor. Configure your email settings:
 
 ```toml
-[Email]
-smtp_server = "smtp.gmail.com"  # Your SMTP server
-Port = 587                      # SMTP port (587 for TLS)
-From = "your-email@gmail.com"   # Your email address
-Password = "your-app-password"  # Email password or app password
-To = "your-kindle@kindle.com"   # Your Kindle email address
+[email]
+smtp_server = "smtp.gmail.com"   # Your SMTP server
+port = 465                       # Implicit TLS port
+from = "your-email@gmail.com"    # Your email address
+password = "your-app-password"   # Email password or app password
+to = "your-kindle@kindle.com"    # Your Kindle email address
 ```
 
 Optionally configure a custom Chrome/Chromium binary:
@@ -134,6 +134,13 @@ go-to-kindle
 - **Ctrl+C**: Quit at any time
 - **Tab/↑↓**: Navigate between input fields and options
 - **Space**: Toggle checkboxes (Include Images, Use Headless Browser)
+
+## Development
+
+Contributor setup and conventions are documented in
+[CONTRIBUTING.md](CONTRIBUTING.md). For the internal design, start with the
+[architecture overview](docs/architecture.md) and the
+[documentation index](docs/README.md).
 
 ## Troubleshooting
 
