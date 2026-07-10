@@ -169,8 +169,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			if m.state == editScreen {
-				initial := initialModel()
-				return initial, initial.spinner.Tick
+				m.state = inputScreen
+				m.article = nil
+				m.filename = ""
+				m.archivePath = ""
+				m.language = ""
+				m.wordCount = 0
+				m.imageCount = 0
+				m.inputSource = ""
+				m.err = nil
+				m.titleInput.Blur()
+				if m.checkboxFocused == 0 {
+					m.urlInput.Focus()
+				}
+				return m, nil
 			}
 		case "enter":
 			switch m.state {
@@ -179,7 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = retrievalScreen
 					return m, tea.Batch(m.spinner.Tick, retrieveClipboardContentCmd())
 				}
-				if m.checkboxFocused == 0 && m.urlInput.Value() != "" {
+				if m.urlInput.Value() != "" {
 					m.state = retrievalScreen
 					return m, tea.Batch(m.spinner.Tick, retrieveContentCmd(m.urlInput.Value(), m.useChromedp, m.debug, m.inputFromCLI))
 
