@@ -248,6 +248,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.wordCount = msg.wordCount
 			m.imageCount = msg.imageCount
 			m.titleInput.SetValue(msg.article.Title)
+			m.includeDates = true
 			m.editFocused = 0
 			m.titleInput.Focus()
 			m.state = editScreen

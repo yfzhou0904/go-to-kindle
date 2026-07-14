@@ -48,6 +48,28 @@ func TestEditScreenDateContextDefaultsOnAndCanBeToggled(t *testing.T) {
 	}
 }
 
+func TestNewlyProcessedArticleResetsDateContextToOn(t *testing.T) {
+	m := initialModel()
+	m.state = editScreen
+	m.article = &readability.Article{Title: "Previous article"}
+	m.includeDates = false
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+	if m.state != inputScreen || m.includeDates {
+		t.Fatal("returning to input should preserve the previous review choice until another article is processed")
+	}
+
+	updated, _ = m.Update(postProcessingCompleteMsg{
+		article:  &readability.Article{Title: "New article"},
+		filename: "New article.html",
+	})
+	got := updated.(model)
+	if got.state != editScreen || !got.includeDates {
+		t.Fatal("date context should default on for each newly processed article")
+	}
+}
+
 func TestInputNavigationIncludesClipboardAction(t *testing.T) {
 	m := initialModel()
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
