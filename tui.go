@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	readability "github.com/go-shiori/go-readability"
+	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
 	"github.com/yfzhou0904/go-to-kindle/postprocessing"
 	"github.com/yfzhou0904/go-to-kindle/util"
 )
@@ -45,6 +47,8 @@ type model struct {
 	checkboxFocused int  // 0 = URL input, 1 = clipboard, 2 = images, 3 = browser
 	inputFromCLI    bool // true when input was supplied as a CLI arg (already shell-unescaped)
 	inputSource     string
+	includeDates    bool
+	editFocused     int // 0 = title, 1 = date context
 	width           int
 }
 
@@ -117,6 +121,7 @@ func initialModel(opts ...ModelOption) model {
 		titleInput:    titleInput,
 		spinner:       s,
 		excludeImages: false,
+		includeDates:  true,
 	}
 
 	// Apply options
@@ -145,6 +150,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.urlInput.Blur()
 				}
+			} else if m.state == editScreen {
+				m.editFocused = (m.editFocused + 1) % 2
+				m.updateEditFocus()
 			}
 		case "up":
 			if m.state == inputScreen {
@@ -154,6 +162,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.urlInput.Blur()
 				}
+			} else if m.state == editScreen {
+				m.editFocused = (m.editFocused + 1) % 2
+				m.updateEditFocus()
 			}
 		case " ":
 			if m.state == inputScreen {
@@ -163,6 +174,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 3:
 					m.useChromedp = !m.useChromedp
 				}
+			} else if m.state == editScreen && m.editFocused == 1 {
+				m.includeDates = !m.includeDates
 			}
 		case "esc":
 			if m.state == completionScreen {
@@ -203,7 +216,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.filename = postprocessing.TitleToFilename(m.titleInput.Value())
 				}
 				m.state = sendingScreen
-				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath))
+				sentTime := time.Now()
+				return m, tea.Batch(m.spinner.Tick, sendArticle(m.article, m.filename, m.archivePath, m.includeDates, sentTime))
 			case completionScreen:
 				// Reset to initial state and return to input screen
 				initial := initialModel()
@@ -234,6 +248,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.wordCount = msg.wordCount
 			m.imageCount = msg.imageCount
 			m.titleInput.SetValue(msg.article.Title)
+			m.includeDates = true
+			m.editFocused = 0
 			m.titleInput.Focus()
 			m.state = editScreen
 		}
@@ -281,6 +297,14 @@ func (m model) contentWidth() int {
 
 func (m model) wrapText(s string) string {
 	return ansi.Wrap(s, m.contentWidth(), " /:_")
+}
+
+func (m *model) updateEditFocus() {
+	if m.editFocused == 0 {
+		m.titleInput.Focus()
+	} else {
+		m.titleInput.Blur()
+	}
 }
 
 func (m model) View() string {
@@ -376,13 +400,28 @@ func (m model) View() string {
 			metadata = fmt.Sprintf("Source: %s • Language: %s • Words: %d • File: %s",
 				source, m.language, m.wordCount, clickableFilePath)
 		}
+		dateCheckbox := "☐"
+		if m.includeDates {
+			dateCheckbox = "☑"
+		}
+		dateStyle := subtleStyle
+		if m.editFocused == 1 {
+			dateStyle = headerStyle
+		}
+		datePreview := ""
+		if m.includeDates {
+			datePreview = "\n" + subtleStyle.Render(m.wrapText(repositories.FormatDateContext(m.article, time.Now())))
+		}
 		return fmt.Sprintf(
-			"%s\n\n%s\n%s\n\n%s\n\n%s\n\n%s\n",
+			"%s\n\n%s\n%s\n\n%s\n\n%s %s%s\n\n%s\n\n%s\n",
 			headerStyle.Render("✏️  Edit Article Title"),
 			subtleStyle.Render(m.wrapText(fmt.Sprintf("Original: %s", m.article.Title))),
 			subtleStyle.Render(m.wrapText(metadata)),
 			m.titleInput.View(),
-			subtleStyle.Render("Press Enter to send to Kindle • Edit title or keep as-is"),
+			dateStyle.Render(dateCheckbox),
+			dateStyle.Render("Add date context to article"),
+			datePreview,
+			subtleStyle.Render("Press Enter to send to Kindle • Tab/↑↓ to navigate • Space to toggle"),
 			subtleStyle.Render("Esc to go back • Ctrl+C to quit"),
 		)
 
@@ -440,9 +479,9 @@ func processContentCmd(input *InputResult, excludeImages bool, debug bool) tea.C
 }
 
 // Command to send article
-func sendArticle(article *readability.Article, filename string, archivePath string) tea.Cmd {
+func sendArticle(article *readability.Article, filename string, archivePath string, includeDateContext bool, sentTime time.Time) tea.Cmd {
 	return func() tea.Msg {
-		err := processAndSend(article, filename, archivePath)
+		err := processAndSend(article, filename, archivePath, includeDateContext, sentTime)
 		return sendCompleteMsg{err: err}
 	}
 }

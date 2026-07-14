@@ -19,7 +19,7 @@ URL, file, webarchive, or clipboard
    Parse, clean, and embed images
               |
               v
-       Review article title
+       Review title and dates
               |
               v
         Archive and email
@@ -59,4 +59,3 @@ The final artifact is a `readability.Article`; storage and delivery do not need
 to know which input produced it.
 
 See the [documentation index](README.md) for each module's detailed behavior.
-

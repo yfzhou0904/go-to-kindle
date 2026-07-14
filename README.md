@@ -10,6 +10,7 @@
 - **Robust Retrieval**: Optional headless browser mode for JS-heavy or blocked sites
 - **Image Support**: Optional image inclusion with automatic resizing (300px max)
 - **Editable Titles**: Review and customize article titles before sending
+- **Date Context**: Optionally prepend published, updated, and sent dates to the Kindle article
 - **Kindle Optimized**: Generates clean HTML files perfect for Kindle reading
 - **Email Delivery**: Automatic SMTP delivery to your Kindle email address
 
@@ -37,7 +38,7 @@ The tool provides an intuitive workflow:
 1. **Input & Options**: Enter a URL/file path or read Markdown from the clipboard
 2. **Content Retrieval**: Fetch content using direct HTTP or the headless browser with progress indicator
 3. **Content Processing**: Readability extraction, image processing, and content cleaning
-4. **Review & Edit**: Check metadata (language, word count, images) and customize title
+4. **Review & Edit**: Check metadata, customize the title, and choose whether to add date context
 5. **Delivery**: Email to Kindle with local archive copy
 
 ## Requirements
@@ -120,6 +121,7 @@ go-to-kindle
 - **Image Processing**: Downloads, resizes, and embeds images as base64 data URLs
 - **Language Detection**: Supports English and Chinese with appropriate word counting
 - **Content Cleaning**: Removes ads, navigation, and irrelevant elements
+- **Date Context**: Adds declared publication/update dates and the send date in `YYYY/M/D` format; enabled by default on the review screen
 
 ### Supported Content
 - News articles from most websites
@@ -133,7 +135,7 @@ go-to-kindle
 - **Enter**: Proceed to next step
 - **Ctrl+C**: Quit at any time
 - **Tab/↑↓**: Navigate between input fields and options
-- **Space**: Toggle checkboxes (Include Images, Use Headless Browser)
+- **Space**: Toggle the focused checkbox, including date context on the review screen
 
 ## Development
 
@@ -152,4 +154,4 @@ Contributor setup and conventions are documented in
 
 ## File Storage
 
-Processed articles are saved to `~/.go-to-kindle/archive/` as HTML files for your records.
+Processed articles are saved to `~/.go-to-kindle/archive/` as HTML files for your records. After a successful send, the archive matches the delivered article, including its optional date context line.
