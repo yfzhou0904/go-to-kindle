@@ -12,7 +12,12 @@ path. If the title changed, it writes the article under the new name and removes
 the old archive file. Otherwise it refreshes the existing file.
 
 Archive HTML includes the article title and Kindle-oriented styling around the
-processed content. Files remain in the archive after successful delivery.
+processed content. When enabled on the review screen, final rendering prepends
+available published and updated dates plus the sent date in `YYYY/M/D` format.
+The initial pre-review archive has no date line; a successful send rewrites it
+to match the delivered attachment. An SMTP failure removes the unconfirmed
+sent date from the archive. Files remain in the archive after successful
+delivery.
 
 ## Email
 

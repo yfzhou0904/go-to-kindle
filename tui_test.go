@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	readability "github.com/go-shiori/go-readability"
 )
 
 func TestInputViewKeepsClipboardActionMinimalAndContextual(t *testing.T) {
@@ -21,6 +23,28 @@ func TestInputViewKeepsClipboardActionMinimalAndContextual(t *testing.T) {
 	}
 	if strings.Contains(view, "Markdown mode") || strings.Contains(view, "Markdown editor") {
 		t.Fatal("unexpected extra Markdown controls")
+	}
+}
+
+func TestEditScreenDateContextDefaultsOnAndCanBeToggled(t *testing.T) {
+	published := time.Date(2020, time.January, 2, 0, 0, 0, 0, time.UTC)
+	m := initialModel()
+	m.state = editScreen
+	m.article = &readability.Article{Title: "Article", PublishedTime: &published}
+	m.titleInput.SetValue("Article")
+
+	if !m.includeDates || !strings.Contains(m.View(), "☑") || !strings.Contains(m.View(), "Published 2020/1/2") {
+		t.Fatal("date context should default on with a preview")
+	}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	got := updated.(model)
+	if got.editFocused != 1 {
+		t.Fatal("Tab should focus the date checkbox")
+	}
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeySpace})
+	got = updated.(model)
+	if got.includeDates || strings.Contains(got.View(), "Published 2020/1/2") {
+		t.Fatal("Space should disable date context and hide its preview")
 	}
 }
 

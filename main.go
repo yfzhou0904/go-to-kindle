@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yfzhou0904/go-to-kindle/internal/repositories"
 	"github.com/yfzhou0904/go-to-kindle/mail"
@@ -29,6 +30,8 @@ var Conf Config = Config{
 		ChromePath: "",
 	},
 }
+
+var sendEmailWithAttachment = mail.SendEmailWithAttachment
 
 func main() {
 	// Parse command line arguments
@@ -68,14 +71,14 @@ func main() {
 }
 
 // Process and send article
-func processAndSend(article *readability.Article, filename string, archivePath string) error {
+func processAndSend(article *readability.Article, filename string, archivePath string, includeDateContext bool, sentTime time.Time) error {
 	repo := repositories.NewLocalFileRepository()
 
 	// Check if we need to update the file with a new title
 	currentArchivePath := filepath.Join(util.BaseDir(), "archive", filename)
 	if currentArchivePath != archivePath {
 		// Title was changed, need to rewrite the file with new filename
-		if err := repo.SaveArticle(article, currentArchivePath); err != nil {
+		if err := saveFinalArticle(repo, article, currentArchivePath, includeDateContext, sentTime); err != nil {
 			return fmt.Errorf("failed to write to new archive file: %v", err)
 		}
 
@@ -87,14 +90,26 @@ func processAndSend(article *readability.Article, filename string, archivePath s
 		archivePath = currentArchivePath
 	} else {
 		// Title unchanged, but we might need to update content if title was edited
-		if err := repo.SaveArticle(article, archivePath); err != nil {
+		if err := saveFinalArticle(repo, article, archivePath, includeDateContext, sentTime); err != nil {
 			return fmt.Errorf("failed to update archive file: %v", err)
 		}
 	}
 
-	if err := mail.SendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), archivePath, Conf.Email.Port); err != nil {
+	if err := sendEmailWithAttachment(Conf.Email.SMTPServer, Conf.Email.From, Conf.Email.Password, Conf.Email.To, strings.TrimSuffix(filename, ".html"), archivePath, Conf.Email.Port); err != nil {
+		if includeDateContext {
+			if restoreErr := repo.SaveArticle(article, archivePath); restoreErr != nil {
+				return fmt.Errorf("failed to send email: %v; failed to remove unsent date context from archive: %v", err, restoreErr)
+			}
+		}
 		return fmt.Errorf("failed to send email: %v", err)
 	}
 
 	return nil
+}
+
+func saveFinalArticle(repo repositories.FileRepository, article *readability.Article, path string, includeDateContext bool, sentTime time.Time) error {
+	if includeDateContext {
+		return repo.SaveArticleWithDates(article, path, sentTime)
+	}
+	return repo.SaveArticle(article, path)
 }
