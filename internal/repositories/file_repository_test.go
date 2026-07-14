@@ -51,6 +51,19 @@ func TestFormatDateContextOmitsSameDayUpdate(t *testing.T) {
 	}
 }
 
+func TestFormatDateContextNormalizesSourceDatesToSentTimezone(t *testing.T) {
+	singapore := time.FixedZone("Singapore", 8*60*60)
+	published := time.Date(2026, time.July, 14, 2, 47, 6, 0, singapore)
+	modified := time.Date(2026, time.July, 13, 18, 52, 33, 0, time.UTC)
+	article := &readability.Article{PublishedTime: &published, ModifiedTime: &modified}
+	sent := time.Date(2026, time.July, 14, 18, 0, 0, 0, singapore)
+
+	got := FormatDateContext(article, sent)
+	if got != "Published 2026/7/14 · Sent 2026/7/14" {
+		t.Fatalf("unexpected mixed-timezone date context: %q", got)
+	}
+}
+
 func TestSaveArticleWithoutDates(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "article.html")
 	article := &readability.Article{Title: "Plain article", Content: "<p>Body</p>"}

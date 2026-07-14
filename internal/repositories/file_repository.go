@@ -83,13 +83,16 @@ func (r *localFileRepository) saveArticle(article *readability.Article, path str
 // FormatDateContext returns the date line shown in the review screen and final article.
 func FormatDateContext(article *readability.Article, sentTime time.Time) string {
 	const dateFormat = "2006/1/2"
+	formatDate := func(date time.Time) string {
+		return date.In(sentTime.Location()).Format(dateFormat)
+	}
 	parts := make([]string, 0, 3)
 	if article.PublishedTime != nil {
-		parts = append(parts, "Published "+article.PublishedTime.Format(dateFormat))
+		parts = append(parts, "Published "+formatDate(*article.PublishedTime))
 	}
-	if article.ModifiedTime != nil && (article.PublishedTime == nil || article.ModifiedTime.Format(dateFormat) != article.PublishedTime.Format(dateFormat)) {
-		parts = append(parts, "Updated "+article.ModifiedTime.Format(dateFormat))
+	if article.ModifiedTime != nil && (article.PublishedTime == nil || formatDate(*article.ModifiedTime) != formatDate(*article.PublishedTime)) {
+		parts = append(parts, "Updated "+formatDate(*article.ModifiedTime))
 	}
-	parts = append(parts, "Sent "+sentTime.Format(dateFormat))
+	parts = append(parts, "Sent "+formatDate(sentTime))
 	return strings.Join(parts, " · ")
 }
