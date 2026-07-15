@@ -30,7 +30,10 @@ func maybeCleanupArchive(retentionDays int) {
 
 	removed, err := cleanupArchive(filepath.Join(util.BaseDir(), "archive"), retentionDays, time.Now())
 	if err != nil {
+		// Leave the marker untouched so the sweep is retried on the next
+		// startup rather than suppressed for a full day.
 		log.Printf("archive cleanup: %v", err)
+		return
 	}
 	if removed > 0 {
 		log.Printf("archive cleanup: removed %d file(s) older than %d day(s)", removed, retentionDays)
