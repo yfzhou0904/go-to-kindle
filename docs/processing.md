@@ -14,10 +14,13 @@ likely extraction failure.
 
 ## Markdown
 
-`ProcessMarkdownWithContext` uses Goldmark with GitHub Flavored Markdown. The
-first level-one heading becomes the title; otherwise the first paragraph or a
-default title is used. Markdown links are preserved, and short Markdown is
-allowed because it is explicit user-provided content.
+`ProcessMarkdownWithContext` uses Goldmark with GitHub Flavored Markdown and
+the `goldmark-meta` extension. A leading YAML frontmatter block (delimited by
+`---`) is parsed and stripped from the output instead of rendering as a stray
+horizontal rule and heading. A frontmatter `title` or `name` becomes the title
+when present; otherwise the first level-one heading is used, falling back to the
+first paragraph or a default title. Markdown links are preserved, and short
+Markdown is allowed because it is explicit user-provided content.
 
 ## Images
 
