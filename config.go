@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Email   ConfigEmail   `toml:"email"`
 	Browser ConfigBrowser `toml:"browser"`
+	Archive ConfigArchive `toml:"archive"`
 }
 type ConfigEmail struct {
 	SMTPServer string `toml:"smtp_server"`
@@ -23,6 +24,11 @@ type ConfigEmail struct {
 }
 type ConfigBrowser struct {
 	ChromePath string `toml:"chrome_path"`
+}
+type ConfigArchive struct {
+	// RetentionDays controls how long processed articles are kept in the
+	// archive directory. 0 keeps files permanently.
+	RetentionDays int `toml:"retention_days"`
 }
 
 func loadConfig() error {

@@ -86,6 +86,13 @@ Optionally configure a custom Chrome/Chromium binary:
 chrome_path = "/usr/bin/chromium"
 ```
 
+Optionally control how long archived articles are kept:
+
+```toml
+[archive]
+retention_days = 365 # delete archived articles older than this; 0 keeps them forever
+```
+
 ### Gmail Setup
 1. Enable 2FA on your Google account
 2. Generate an App Password for go-to-kindle
@@ -155,3 +162,5 @@ Contributor setup and conventions are documented in
 ## File Storage
 
 Processed articles are saved to `~/.go-to-kindle/archive/` as HTML files for your records. After a successful send, the archive matches the delivered article, including its optional date context line.
+
+Archived files older than `archive.retention_days` (default 365) are pruned automatically at startup, at most once per day. Set `retention_days = 0` to keep files permanently.

@@ -29,6 +29,9 @@ var Conf Config = Config{
 	Browser: ConfigBrowser{
 		ChromePath: "",
 	},
+	Archive: ConfigArchive{
+		RetentionDays: 365,
+	},
 }
 
 var sendEmailWithAttachment = mail.SendEmailWithAttachment
@@ -55,6 +58,8 @@ func main() {
 	if err := loadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	maybeCleanupArchive(Conf.Archive.RetentionDays)
 
 	var modelOpts []ModelOption
 	if url != "" {

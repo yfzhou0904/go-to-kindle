@@ -6,4 +6,7 @@ password = "123"
 to = "username@kindle.com"
 
 [browser]
-chrome_path = "/path/to/chrome" 
+chrome_path = "/path/to/chrome"
+
+[archive]
+retention_days = 365 # delete archived articles older than this; 0 keeps them forever
