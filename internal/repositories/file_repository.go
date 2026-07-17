@@ -3,6 +3,8 @@ package repositories
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -31,6 +33,7 @@ type htmlData struct {
 const htmlTemplate = `<!DOCTYPE html>
 <html>
 <head>
+        <meta charset="utf-8">
         <title>{{.Title}}</title>
         <meta name="author" content="{{.Author}}">
        <style>
@@ -74,10 +77,41 @@ func (r *localFileRepository) saveArticle(article *readability.Article, path str
 	data := htmlData{
 		Title:       article.Title,
 		Author:      article.Byline,
-		Content:     article.Content,
+		Content:     defuseCodeTokens(article.Content),
 		DateContext: dateContext,
 	}
 	return t.Execute(file, data)
+}
+
+// codeBlockRE matches the inner text of each <code> element (which is where all
+// fenced, indented, and inline code lands after rendering).
+var codeBlockRE = regexp.MustCompile(`(?s)(<code[^>]*>)(.*?)(</code>)`)
+
+// wordOrEntityRE matches either an existing HTML entity (left untouched) or a
+// word of source text (whose first letter we encode).
+var wordOrEntityRE = regexp.MustCompile(`&#?[0-9A-Za-z]+;|[A-Za-z][A-Za-z0-9_]*`)
+
+// defuseCodeTokens rewrites the first letter of every word inside <code> blocks
+// as a numeric character reference (e.g. "from" -> "&#102;rom"). This renders
+// byte-for-byte identically to the reader but ensures no source-language keyword
+// (from/import/def/class/print/...) survives as literal ASCII in the file. That
+// prevents content sniffers (libmagic, and Amazon's Send-to-Kindle converter)
+// from misclassifying code-heavy documents as a script instead of HTML, which
+// would otherwise be delivered as plain text and rendered with raw tags visible.
+// The transform is content-agnostic: it defeats detection regardless of which
+// keywords appear, without enumerating any language.
+func defuseCodeTokens(content string) string {
+	return codeBlockRE.ReplaceAllStringFunc(content, func(block string) string {
+		m := codeBlockRE.FindStringSubmatch(block)
+		open, inner, closeTag := m[1], m[2], m[3]
+		encoded := wordOrEntityRE.ReplaceAllStringFunc(inner, func(tok string) string {
+			if strings.HasPrefix(tok, "&") {
+				return tok // existing entity such as &lt; or &#39; — leave intact
+			}
+			return "&#" + strconv.Itoa(int(tok[0])) + ";" + tok[1:]
+		})
+		return open + encoded + closeTag
+	})
 }
 
 // FormatDateContext returns the date line shown in the review screen and final article.
