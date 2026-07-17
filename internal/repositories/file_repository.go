@@ -87,9 +87,11 @@ func (r *localFileRepository) saveArticle(article *readability.Article, path str
 // fenced, indented, and inline code lands after rendering).
 var codeBlockRE = regexp.MustCompile(`(?s)(<code[^>]*>)(.*?)(</code>)`)
 
-// wordOrEntityRE matches either an existing HTML entity (left untouched) or a
-// word of source text (whose first letter we encode).
-var wordOrEntityRE = regexp.MustCompile(`&#?[0-9A-Za-z]+;|[A-Za-z][A-Za-z0-9_]*`)
+// codeTokenRE matches, in priority order, a nested tag (e.g. syntax-highlight
+// <span>) or an existing HTML entity — both left untouched — or a word of
+// source text whose first letter we encode. Matching tags and entities keeps us
+// from rewriting markup or attribute values inside highlighted code blocks.
+var codeTokenRE = regexp.MustCompile(`<[^>]*>|&#?[0-9A-Za-z]+;|[A-Za-z][A-Za-z0-9_]*`)
 
 // defuseCodeTokens rewrites the first letter of every word inside <code> blocks
 // as a numeric character reference (e.g. "from" -> "&#102;rom"). This renders
@@ -104,9 +106,9 @@ func defuseCodeTokens(content string) string {
 	return codeBlockRE.ReplaceAllStringFunc(content, func(block string) string {
 		m := codeBlockRE.FindStringSubmatch(block)
 		open, inner, closeTag := m[1], m[2], m[3]
-		encoded := wordOrEntityRE.ReplaceAllStringFunc(inner, func(tok string) string {
-			if strings.HasPrefix(tok, "&") {
-				return tok // existing entity such as &lt; or &#39; — leave intact
+		encoded := codeTokenRE.ReplaceAllStringFunc(inner, func(tok string) string {
+			if strings.HasPrefix(tok, "<") || strings.HasPrefix(tok, "&") {
+				return tok // nested tag or existing entity — leave intact
 			}
 			return "&#" + strconv.Itoa(int(tok[0])) + ";" + tok[1:]
 		})
