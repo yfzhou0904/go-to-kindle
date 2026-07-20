@@ -2,6 +2,10 @@
 
 📚 An interactive CLI tool that fetches web articles, processes them for readability, and sends them to your Kindle device.
 
+## Quick Tour
+
+![A short terminal demo of importing an article and reviewing it before sending to Kindle](docs/assets/demo.gif)
+
 ## Features
 
 - **Interactive Terminal UI**: Modern Bubbletea-based interface with guided workflow
