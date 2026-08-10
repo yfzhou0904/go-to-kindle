@@ -12,6 +12,17 @@ links are removed from the final content.
 Articles with fewer than 100 detected words are rejected by orchestration as a
 likely extraction failure.
 
+### JS-revealed bodies
+
+Readability discards nodes carrying an inline `visibility: hidden` style. Some
+sites — WeChat's `mp.weixin.qq.com` most notably — ship the article body hidden
+that way and reveal it from JavaScript after load, so plain HTTP retrieval would
+extract only the surrounding chrome while the same page saved as a webarchive
+parses correctly. `parseArticle` therefore retries the parse with inline
+`visibility: hidden` declarations stripped, and keeps that result only when it
+yields more than twice the text of the normal parse. Pages that legitimately
+hide small elements are unaffected.
+
 ## Markdown
 
 `ProcessMarkdownWithContext` uses Goldmark with GitHub Flavored Markdown and

@@ -3,6 +3,7 @@ package postprocessing
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,7 +31,11 @@ func ProcessArticleWithResolver(resp *http.Response, excludeImages bool, resolve
 // handles the complete post-processing pipeline with context support
 func ProcessArticleWithContext(ctx context.Context, resp *http.Response, excludeImages bool, resolver ImageResolver) (*readability.Article, string, int, error) {
 	// Parse webpage using readability
-	article, err := readability.FromReader(resp.Body, resp.Request.URL)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("failed to read webpage: %v", err)
+	}
+	article, err := parseArticle(body, resp.Request.URL)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to parse webpage: %v", err)
 	}
