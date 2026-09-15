@@ -47,7 +47,7 @@ The tool provides an intuitive workflow:
 
 ## Requirements
 
-- Go 1.25 or newer
+- Go 1.26 or newer
 - Email account with SMTP access (Gmail, Outlook, etc.)
 - Kindle device with email delivery enabled
 
