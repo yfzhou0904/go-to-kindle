@@ -48,6 +48,10 @@ func loadConfig() error {
 func initConfig(path string) error {
 	fmt.Println("Initializing example config file at", path)
 
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+
 	file, err := os.Create(path)
 	if err != nil {
 		return err
