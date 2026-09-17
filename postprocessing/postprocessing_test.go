@@ -237,3 +237,63 @@ func TestTitleToFilenameReplacesProblematicCharacters(t *testing.T) {
 		t.Fatalf("unexpected filename: %q", filename)
 	}
 }
+
+func TestTitleFromURLMirrorsBrowserTabLabel(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want string
+	}{
+		{"https://www.damtp.cam.ac.uk/events/strings02/dirac/speach.html", "www.damtp.cam.ac.uk/events/strings02/dirac/speach.html"},
+		{"https://example.com/", "example.com"},
+		{"https://example.com", "example.com"},
+		{"http://example.com/a/b/", "example.com/a/b"},
+	}
+
+	for _, tc := range cases {
+		u, err := url.Parse(tc.raw)
+		if err != nil {
+			t.Fatalf("failed to parse %q: %v", tc.raw, err)
+		}
+		if got := TitleFromURL(u); got != tc.want {
+			t.Errorf("TitleFromURL(%q) = %q, want %q", tc.raw, got, tc.want)
+		}
+	}
+}
+
+func TestTitleToFilenameFallsBackWhenTitleEmpty(t *testing.T) {
+	if got := TitleToFilename("   "); got != "untitled.html" {
+		t.Errorf("expected untitled.html, got %q", got)
+	}
+}
+
+func TestProcessArticleUsesURLWhenNoTitleFound(t *testing.T) {
+	// Hand-written page with no <head>, no <title>, no <h1>: readability finds
+	// no title at all, so we should fall back to the URL.
+	body := `<html><body><center><table>
+	<tr><td align=center><big>The Relation between Mathematics and Physics</big></td></tr>
+	<tr><td><p>` + strings.Repeat("The physicist, in his study of natural phenomena, has two methods of making progress. ", 40) + `</p></td></tr>
+	</table></center></body></html>`
+
+	u, err := url.Parse("https://www.damtp.cam.ac.uk/events/strings02/dirac/speach.html")
+	if err != nil {
+		t.Fatalf("failed to parse url: %v", err)
+	}
+
+	resp := &http.Response{
+		Body:    io.NopCloser(strings.NewReader(body)),
+		Request: &http.Request{URL: u},
+	}
+
+	article, filename, _, err := ProcessArticle(resp, true)
+	if err != nil {
+		t.Fatalf("ProcessArticle failed: %v", err)
+	}
+
+	want := "www.damtp.cam.ac.uk/events/strings02/dirac/speach.html"
+	if article.Title != want {
+		t.Errorf("title = %q, want %q", article.Title, want)
+	}
+	if filename != "www.damtp.cam.ac.uk_events_strings02_dirac_speach.html" {
+		t.Errorf("unexpected filename %q", filename)
+	}
+}

@@ -58,6 +58,12 @@ func ProcessArticleWithContext(ctx context.Context, resp *http.Response, exclude
 	// Generate filename from title or path
 	var filename string
 	if strings.HasPrefix(resp.Request.URL.String(), "http") {
+		// Some hand-written pages carry no <title>, no metadata and no single
+		// <h1>, which leaves readability with nothing to work from. Fall back to
+		// the URL, the way a browser labels such a tab.
+		if strings.TrimSpace(article.Title) == "" {
+			article.Title = TitleFromURL(resp.Request.URL)
+		}
 		filename = TitleToFilename(article.Title)
 	} else {
 		// For local files, extract filename from path
@@ -183,8 +189,28 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 
 const maxFilenameBaseBytes = 200
 
+// TitleFromURL builds a human-readable stand-in title from a URL, mirroring how
+// browsers label a tab for a page that declares no title: host plus path, with
+// the scheme and any trailing slash dropped.
+func TitleFromURL(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+
+	title := u.Host + u.Path
+	title = strings.TrimSuffix(title, "/")
+	if title == "" {
+		title = u.String()
+	}
+	return title
+}
+
 // TitleToFilename replaces problematic characters in page title to give a generally valid filename.
 func TitleToFilename(title string) string {
+	if strings.TrimSpace(title) == "" {
+		title = "untitled"
+	}
+
 	filename := strings.ReplaceAll(title, "/", "_")
 	filename = strings.ReplaceAll(filename, "\\", "_")
 	filename = strings.ReplaceAll(filename, ":", "_")
@@ -195,6 +221,10 @@ func TitleToFilename(title string) string {
 	filename = strings.ReplaceAll(filename, ">", "_")
 	filename = strings.ReplaceAll(filename, "|", "_")
 	filename = truncateStringBytes(filename, maxFilenameBaseBytes)
+	// URL-derived titles often already end in .html; don't double the suffix.
+	if strings.HasSuffix(strings.ToLower(filename), ".html") {
+		return filename
+	}
 	return filename + ".html"
 }
 
