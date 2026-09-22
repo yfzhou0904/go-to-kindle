@@ -297,3 +297,77 @@ func TestProcessArticleUsesURLWhenNoTitleFound(t *testing.T) {
 		t.Errorf("unexpected filename %q", filename)
 	}
 }
+
+func TestProcessArticleReplacesEmbeddedMedia(t *testing.T) {
+	// Kindle falls back to a fixed layout (E016) when an article contains <video>.
+	para := "<p>" + strings.Repeat("Reinforcement learning scales with verifiable tasks. ", 40) + "</p>"
+	body := `<html><head><title>Media</title></head><body><article>` + para +
+		`<video src="https://example.com/demo.mp4" controls title="demo.mp4"></video>` + para +
+		`<audio src="https://example.com/a.mp3"></audio>` + para + `</article></body></html>`
+
+	u, _ := url.Parse("https://example.com/post")
+	resp := &http.Response{
+		Body:    io.NopCloser(strings.NewReader(body)),
+		Request: &http.Request{URL: u},
+	}
+
+	article, _, _, err := ProcessArticle(resp, true)
+	if err != nil {
+		t.Fatalf("ProcessArticle failed: %v", err)
+	}
+
+	for _, tag := range []string{"<video", "<audio", "<iframe"} {
+		if strings.Contains(article.Content, tag) {
+			t.Errorf("content still contains %s", tag)
+		}
+	}
+	for _, want := range []string{"[Video: demo.mp4]", "[Audio]"} {
+		if !strings.Contains(article.Content, want) {
+			t.Errorf("content missing placeholder %q", want)
+		}
+	}
+}
+
+func TestProcessArticleKeepsContentSVGsAndDropsIcons(t *testing.T) {
+	para := "<p>" + strings.Repeat("A pelican rides a bicycle along the California coast. ", 40) + "</p>"
+	body := `<html><head><title>SVG</title></head><body><article>` + para +
+		`<p><a href="/share"><svg viewBox="0 0 24 24" id="share-link"><path d="M0 0h24v24H0z"/></svg>Share</a></p>` +
+		`<p><svg aria-hidden="true" viewBox="0 0 400 400" id="hidden"><path d="M0 0h400v400H0z"/></svg></p>` +
+		`<p><svg width="16" height="16" id="small"><circle cx="8" cy="8" r="8"/></svg></p>` + para +
+		`<svg viewBox="0 0 800 600" id="diagram" onload="alert(1)"><script>alert(2)</script>` +
+		`<circle cx="400" cy="300" r="100" onclick="alert(3)"/><animate attributeName="r"/></svg>` +
+		para + `</article></body></html>`
+
+	u, _ := url.Parse("https://example.com/post")
+	newResp := func() *http.Response {
+		return &http.Response{Body: io.NopCloser(strings.NewReader(body)), Request: &http.Request{URL: u}}
+	}
+
+	article, _, _, err := ProcessArticle(newResp(), false)
+	if err != nil {
+		t.Fatalf("ProcessArticle failed: %v", err)
+	}
+	content := article.Content
+
+	if !strings.Contains(content, `id="diagram"`) {
+		t.Fatalf("content SVG was removed:\n%s", content)
+	}
+	for _, id := range []string{"share-link", "hidden", "small"} {
+		if strings.Contains(content, `id="`+id+`"`) {
+			t.Errorf("decorative SVG %q was kept", id)
+		}
+	}
+	for _, unsafe := range []string{"<script", "onload", "onclick", "<animate"} {
+		if strings.Contains(content, unsafe) {
+			t.Errorf("kept SVG still contains %q", unsafe)
+		}
+	}
+
+	excluded, _, _, err := ProcessArticle(newResp(), true)
+	if err != nil {
+		t.Fatalf("ProcessArticle failed: %v", err)
+	}
+	if strings.Contains(excluded.Content, "<svg") {
+		t.Errorf("SVG kept although images are excluded")
+	}
+}

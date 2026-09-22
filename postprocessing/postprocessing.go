@@ -3,10 +3,12 @@ package postprocessing
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -164,12 +166,13 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 				s.Remove()
 			}
 		})
+		cleanInlineSVGs(contentDoc)
 	} else {
-		contentDoc.Find("img,figure,picture,source").Remove()
+		contentDoc.Find("img,figure,picture,source,svg").Remove()
 	}
 
 	// Remove other media and unwanted elements (but keep processed images)
-	contentDoc.Find("svg").Remove()
+	replaceEmbeddedMedia(contentDoc)
 
 	// Remove <a> tags but keep their contents (text, images, etc.)
 	if !preserveLinks {
@@ -185,6 +188,83 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 	}
 
 	return article, imageCount, nil
+}
+
+// iconSVGMaxSize is the largest declared width and height, in pixels, at which
+// an inline SVG is treated as an icon rather than article content.
+const iconSVGMaxSize = 64
+
+// cleanInlineSVGs keeps content SVGs such as diagrams, which Kindle renders in
+// reflowable layout, and removes decorative icons. Kept SVGs are reduced to
+// static drawing.
+func cleanInlineSVGs(doc *goquery.Document) {
+	doc.Find("svg").Each(func(i int, s *goquery.Selection) {
+		if isDecorativeSVG(s) {
+			s.Remove()
+			return
+		}
+		s.Find("script,foreignObject,animate,animateMotion,animateTransform,set").Remove()
+		s.Find("*").AddSelection(s).Each(func(i int, el *goquery.Selection) {
+			for _, attr := range el.Nodes[0].Attr {
+				if strings.HasPrefix(strings.ToLower(attr.Key), "on") {
+					el.RemoveAttr(attr.Key)
+				}
+			}
+		})
+	})
+}
+
+func isDecorativeSVG(s *goquery.Selection) bool {
+	if s.AttrOr("aria-hidden", "") == "true" || s.AttrOr("role", "") == "presentation" {
+		return true
+	}
+	if s.ParentsFiltered("a,button").Length() > 0 {
+		return true
+	}
+	width, height, ok := svgSize(s)
+	return ok && width <= iconSVGMaxSize && height <= iconSVGMaxSize
+}
+
+// svgSize returns the declared width and height, falling back to the viewBox.
+func svgSize(s *goquery.Selection) (float64, float64, bool) {
+	width, wok := parseSVGLength(s.AttrOr("width", ""))
+	height, hok := parseSVGLength(s.AttrOr("height", ""))
+	if wok && hok {
+		return width, height, true
+	}
+	fields := strings.FieldsFunc(s.AttrOr("viewBox", s.AttrOr("viewbox", "")), func(r rune) bool {
+		return r == ' ' || r == ','
+	})
+	if len(fields) != 4 {
+		return 0, 0, false
+	}
+	width, werr := strconv.ParseFloat(fields[2], 64)
+	height, herr := strconv.ParseFloat(fields[3], 64)
+	return width, height, werr == nil && herr == nil
+}
+
+// parseSVGLength parses unitless or pixel lengths; percentages and other units
+// are not treated as sizes.
+func parseSVGLength(v string) (float64, bool) {
+	n, err := strconv.ParseFloat(strings.TrimSuffix(strings.TrimSpace(v), "px"), 64)
+	return n, err == nil
+}
+
+// replaceEmbeddedMedia swaps video, audio, and embedded frames for a short text
+// placeholder. Kindle cannot render them, and a <video> element makes Kindle's
+// converter fall back to a fixed, non-reflowable layout (error E016).
+func replaceEmbeddedMedia(doc *goquery.Document) {
+	labels := map[string]string{"video": "Video", "audio": "Audio"}
+	doc.Find("video,audio,iframe,embed,object").Each(func(i int, s *goquery.Selection) {
+		label, ok := labels[goquery.NodeName(s)]
+		if !ok {
+			label = "Embedded content"
+		}
+		if title := strings.TrimSpace(s.AttrOr("title", "")); title != "" {
+			label += ": " + title
+		}
+		s.ReplaceWithHtml("<p><em>[" + html.EscapeString(label) + "]</em></p>")
+	})
 }
 
 const maxFilenameBaseBytes = 200
