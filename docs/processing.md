@@ -14,6 +14,10 @@ The `postprocessing` package converts normalized input into a Kindle-ready `read
 
 Image processing in `postprocessing/images.go` handles `img`, `picture`, source sets, lazy-loading attributes, and base64 data URLs. Resolvers obtain bytes from either the network or bundled webarchive resources. Supported images are resized to a maximum dimension and embedded as data URLs unless the user excludes images.
 
+## Embedded Media
+
+Inline SVG is removed. `video`, `audio`, `iframe`, `embed`, and `object` elements are replaced with a short text placeholder such as `[Video: demo.mp4]`. Kindle cannot play media, and a `<video>` element makes Amazon's converter fall back to a fixed, non-reflowable layout (error E016).
+
 ## Output Metadata
 
 Orchestration detects English or Chinese for display and word counting. The processor counts embedded images and derives a filesystem-safe `.html` filename from the title. Filename truncation respects UTF-8 boundaries.

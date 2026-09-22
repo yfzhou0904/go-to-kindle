@@ -3,6 +3,7 @@ package postprocessing
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"os"
@@ -170,6 +171,7 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 
 	// Remove other media and unwanted elements (but keep processed images)
 	contentDoc.Find("svg").Remove()
+	replaceEmbeddedMedia(contentDoc)
 
 	// Remove <a> tags but keep their contents (text, images, etc.)
 	if !preserveLinks {
@@ -185,6 +187,23 @@ func processContent(article *readability.Article, baseURL *url.URL, excludeImage
 	}
 
 	return article, imageCount, nil
+}
+
+// replaceEmbeddedMedia swaps video, audio, and embedded frames for a short text
+// placeholder. Kindle cannot render them, and a <video> element makes Kindle's
+// converter fall back to a fixed, non-reflowable layout (error E016).
+func replaceEmbeddedMedia(doc *goquery.Document) {
+	labels := map[string]string{"video": "Video", "audio": "Audio"}
+	doc.Find("video,audio,iframe,embed,object").Each(func(i int, s *goquery.Selection) {
+		label, ok := labels[goquery.NodeName(s)]
+		if !ok {
+			label = "Embedded content"
+		}
+		if title := strings.TrimSpace(s.AttrOr("title", "")); title != "" {
+			label += ": " + title
+		}
+		s.ReplaceWithHtml("<p><em>[" + html.EscapeString(label) + "]</em></p>")
+	})
 }
 
 const maxFilenameBaseBytes = 200

@@ -297,3 +297,33 @@ func TestProcessArticleUsesURLWhenNoTitleFound(t *testing.T) {
 		t.Errorf("unexpected filename %q", filename)
 	}
 }
+
+func TestProcessArticleReplacesEmbeddedMedia(t *testing.T) {
+	// Kindle falls back to a fixed layout (E016) when an article contains <video>.
+	para := "<p>" + strings.Repeat("Reinforcement learning scales with verifiable tasks. ", 40) + "</p>"
+	body := `<html><head><title>Media</title></head><body><article>` + para +
+		`<video src="https://example.com/demo.mp4" controls title="demo.mp4"></video>` + para +
+		`<audio src="https://example.com/a.mp3"></audio>` + para + `</article></body></html>`
+
+	u, _ := url.Parse("https://example.com/post")
+	resp := &http.Response{
+		Body:    io.NopCloser(strings.NewReader(body)),
+		Request: &http.Request{URL: u},
+	}
+
+	article, _, _, err := ProcessArticle(resp, true)
+	if err != nil {
+		t.Fatalf("ProcessArticle failed: %v", err)
+	}
+
+	for _, tag := range []string{"<video", "<audio", "<iframe"} {
+		if strings.Contains(article.Content, tag) {
+			t.Errorf("content still contains %s", tag)
+		}
+	}
+	for _, want := range []string{"[Video: demo.mp4]", "[Audio]"} {
+		if !strings.Contains(article.Content, want) {
+			t.Errorf("content missing placeholder %q", want)
+		}
+	}
+}
