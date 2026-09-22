@@ -16,7 +16,9 @@ Image processing in `postprocessing/images.go` handles `img`, `picture`, source 
 
 ## Embedded Media
 
-Inline SVG is removed. `video`, `audio`, `iframe`, `embed`, and `object` elements are replaced with a short text placeholder such as `[Video: demo.mp4]`. Kindle cannot play media, and a `<video>` element makes Amazon's converter fall back to a fixed, non-reflowable layout (error E016).
+Inline SVG diagrams are kept, since Kindle renders them in reflowable layout. Decorative SVGs are removed: those marked `aria-hidden` or `role="presentation"`, those inside links or buttons, and those declared at 64px or smaller. Kept SVGs lose scripts, `foreignObject`, animation elements, and event handler attributes. When images are excluded, all SVGs are removed.
+
+`video`, `audio`, `iframe`, `embed`, and `object` elements are replaced with a short text placeholder such as `[Video: demo.mp4]`. Kindle cannot play media, and a `<video>` element makes Amazon's converter fall back to a fixed, non-reflowable layout (error E016).
 
 ## Output Metadata
 

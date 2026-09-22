@@ -36,6 +36,7 @@ const htmlTemplate = `<!DOCTYPE html>
        <style>
                body { line-height: 1.5; }
                img { display: block; max-width: 100%; height: auto; margin-left: auto; margin-right: auto; }
+               svg { display: block; max-width: 100%; height: auto; margin-left: auto; margin-right: auto; }
                pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 0.75em; background: #f3f3f3; }
                code { font-family: monospace; }
                table { width: 100%; border-collapse: collapse; }
